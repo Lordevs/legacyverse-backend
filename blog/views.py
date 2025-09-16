@@ -1,0 +1,339 @@
+from rest_framework import generics, status, permissions
+from rest_framework.decorators import api_view, permission_classes, action
+from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
+from django.shortcuts import get_object_or_404
+from django.db.models import Q, Count
+from django.utils import timezone
+from django.http import Http404
+from django.conf import settings
+import openai
+import logging
+
+from .models import Blog, Comment, Like, SavedBlog, BlogView
+from .serializers import (
+    BlogSerializer, BlogCreateSerializer, BlogUpdateSerializer, 
+    BlogListSerializer, CommentSerializer, CommentCreateSerializer,
+    LikeSerializer, SavedBlogSerializer, BlogViewSerializer,
+    AIBlogGenerationSerializer
+)
+
+logger = logging.getLogger(__name__)
+
+
+class BlogViewSet(ModelViewSet):
+    """
+    ViewSet for blog CRUD operations
+    """
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return BlogCreateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return BlogUpdateSerializer
+        elif self.action == 'list':
+            return BlogListSerializer
+        return BlogSerializer
+    
+    def get_queryset(self):
+        queryset = Blog.objects.select_related('author').prefetch_related(
+            'likes', 'comments', 'saved_by_users'
+        ).annotate(
+            likes_count=Count('likes', filter=Q(likes__is_liked=True)),
+            comments_count=Count('comments')
+        )
+        
+        # Filter by status for public access
+        if not self.request.user.is_authenticated:
+            queryset = queryset.filter(status='public')
+        elif self.action == 'list':
+            # For authenticated users, show their own drafts and all public blogs
+            queryset = queryset.filter(
+                Q(status='public') | Q(author=self.request.user)
+            )
+        
+        # Filter by author if specified
+        author_id = self.request.query_params.get('author')
+        if author_id:
+            queryset = queryset.filter(author_id=author_id)
+        
+        # Filter by status
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        # Filter by tags
+        tags = self.request.query_params.get('tags')
+        if tags:
+            tag_list = [tag.strip() for tag in tags.split(',')]
+            for tag in tag_list:
+                queryset = queryset.filter(tags__icontains=tag)
+        
+        # Search functionality
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search) | 
+                Q(content__icontains=search) | 
+                Q(excerpt__icontains=search) |
+                Q(tags__icontains=search)
+            )
+        
+        return queryset.order_by('-created_at')
+    
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+    
+    def perform_update(self, serializer):
+        # Only allow authors to update their own blogs
+        if serializer.instance.author != self.request.user:
+            raise PermissionError("You can only update your own blogs")
+        serializer.save()
+    
+    def perform_destroy(self, instance):
+        # Only allow authors to delete their own blogs
+        if instance.author != self.request.user:
+            raise PermissionError("You can only delete your own blogs")
+        instance.delete()
+    
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def like(self, request, pk=None):
+        """Toggle like for a blog"""
+        blog = self.get_object()
+        like, created = Like.objects.get_or_create(
+            blog=blog, 
+            user=request.user,
+            defaults={'is_liked': True}
+        )
+        
+        if not created:
+            like.is_liked = not like.is_liked
+            like.save()
+        
+        return Response({
+            'is_liked': like.is_liked,
+            'likes_count': blog.likes_count
+        })
+    
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def save(self, request, pk=None):
+        """Save or unsave a blog"""
+        blog = self.get_object()
+        saved_blog, created = SavedBlog.objects.get_or_create(
+            blog=blog,
+            user=request.user
+        )
+        
+        if not created:
+            saved_blog.delete()
+            is_saved = False
+        else:
+            is_saved = True
+        
+        return Response({'is_saved': is_saved})
+    
+    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def track_view(self, request, pk=None):
+        """Track blog view for analytics"""
+        blog = self.get_object()
+        
+        # Get client IP
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip_address = x_forwarded_for.split(',')[0]
+        else:
+            ip_address = request.META.get('REMOTE_ADDR')
+        
+        # Create view record (only if not already viewed recently)
+        view, created = BlogView.objects.get_or_create(
+            blog=blog,
+            user=request.user if request.user.is_authenticated else None,
+            defaults={'ip_address': ip_address}
+        )
+        
+        return Response({'viewed': created})
+
+
+class CommentViewSet(ModelViewSet):
+    """
+    ViewSet for comment CRUD operations
+    """
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return CommentCreateSerializer
+        return CommentSerializer
+    
+    def get_queryset(self):
+        blog_id = self.kwargs.get('blog_pk')
+        if blog_id:
+            return Comment.objects.filter(
+                blog_id=blog_id,
+                parent_comment__isnull=True  # Only top-level comments
+            ).select_related('author').prefetch_related('replies__author').order_by('-created_at')
+        return Comment.objects.none()
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['blog_id'] = self.kwargs.get('blog_pk')
+        return context
+    
+    def perform_create(self, serializer):
+        blog_id = self.kwargs.get('blog_pk')
+        blog = get_object_or_404(Blog, id=blog_id)
+        serializer.save(blog=blog, author=self.request.user)
+    
+    def perform_update(self, serializer):
+        # Only allow authors to update their own comments
+        if serializer.instance.author != self.request.user:
+            raise PermissionError("You can only update your own comments")
+        serializer.save(is_edited=True)
+    
+    def perform_destroy(self, instance):
+        # Only allow authors to delete their own comments
+        if instance.author != self.request.user:
+            raise PermissionError("You can only delete your own comments")
+        instance.delete()
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def generate_ai_blog(request):
+    """
+    Generate or rewrite blog content using OpenAI
+    """
+    serializer = AIBlogGenerationSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Initialize OpenAI client
+        openai.api_key = getattr(settings, 'OPENAI_API_KEY', None)
+        if not openai.api_key:
+            return Response(
+                {'error': 'OpenAI API key not configured'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        prompt = serializer.validated_data['prompt']
+        content_source = serializer.validated_data['content_source']
+        title = serializer.validated_data.get('title', '')
+        
+        # Create different prompts based on content source
+        if content_source == 'ai_generated':
+            system_prompt = """You are a professional blog writer. Create an engaging, well-structured blog post based on the user's prompt. 
+            The blog should be informative, well-organized with clear headings, and written in a professional yet accessible tone."""
+            user_prompt = f"Write a blog post about: {prompt}"
+        else:  # ai_rewritten
+            system_prompt = """You are a professional blog editor. Rewrite the provided content to make it more engaging, clear, and well-structured. 
+            Improve the flow, clarity, and overall quality while maintaining the original meaning and key points."""
+            user_prompt = f"Rewrite this content to make it better: {prompt}"
+        
+        # Generate content using OpenAI
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            max_tokens=2000,
+            temperature=0.7
+        )
+        
+        generated_content = response.choices[0].message.content
+        
+        # Extract title if not provided
+        if not title and content_source == 'ai_generated':
+            # Try to extract title from generated content
+            lines = generated_content.split('\n')
+            for line in lines:
+                if line.strip() and not line.startswith('#') and len(line.strip()) < 100:
+                    title = line.strip()
+                    break
+        
+        return Response({
+            'title': title,
+            'content': generated_content,
+            'content_source': content_source,
+            'ai_prompt': prompt
+        })
+        
+    except Exception as e:
+        logger.error(f"OpenAI API error: {str(e)}")
+        return Response(
+            {'error': 'Failed to generate content. Please try again.'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def user_saved_blogs(request):
+    """
+    Get all blogs saved by the authenticated user
+    """
+    saved_blogs = SavedBlog.objects.filter(user=request.user).select_related(
+        'blog__author'
+    ).order_by('-created_at')
+    
+    serializer = SavedBlogSerializer(saved_blogs, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def user_blogs(request):
+    """
+    Get all blogs by the authenticated user
+    """
+    blogs = Blog.objects.filter(author=request.user).annotate(
+        likes_count=Count('likes', filter=Q(likes__is_liked=True)),
+        comments_count=Count('comments')
+    ).order_by('-created_at')
+    
+    serializer = BlogSerializer(blogs, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def blog_detail_by_slug(request, slug):
+    """
+    Get blog detail by slug (for SEO-friendly URLs)
+    """
+    try:
+        blog = Blog.objects.select_related('author').prefetch_related(
+            'likes', 'comments__author', 'saved_by_users'
+        ).annotate(
+            likes_count=Count('likes', filter=Q(likes__is_liked=True)),
+            comments_count=Count('comments')
+        ).get(slug=slug)
+        
+        # Check if user can view this blog
+        if blog.status != 'public' and (
+            not request.user.is_authenticated or 
+            blog.author != request.user
+        ):
+            raise Http404("Blog not found")
+        
+        # Track view
+        if request.user.is_authenticated:
+            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                ip_address = x_forwarded_for.split(',')[0]
+            else:
+                ip_address = request.META.get('REMOTE_ADDR')
+            
+            BlogView.objects.get_or_create(
+                blog=blog,
+                user=request.user,
+                defaults={'ip_address': ip_address}
+            )
+        
+        serializer = BlogSerializer(blog, context={'request': request})
+        return Response(serializer.data)
+        
+    except Blog.DoesNotExist:
+        raise Http404("Blog not found")

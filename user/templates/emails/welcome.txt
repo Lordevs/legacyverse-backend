@@ -1,0 +1,22 @@
+Welcome to {{ site_name }}!
+
+Hello {{ user.fullname }},
+
+Welcome to {{ site_name }}! We're excited to have you join our community.
+
+Your account has been successfully created with the email: {{ user.email }}
+
+You can now:
+- Complete your profile
+- Share your legacy stories
+- Connect with other community members
+- Explore inspiring content
+
+If you have any questions or need help getting started, don't hesitate to reach out to our support team.
+
+Best regards,
+The {{ site_name }} Team
+
+---
+If you have any questions, please contact us at {{ support_email }}
+© 2024 {{ site_name }}. All rights reserved.
