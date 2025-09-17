@@ -28,6 +28,9 @@ urlpatterns = [
     
     # AI Blog Generation
     path('api/ai/generate-blog/', views.generate_ai_blog, name='generate-ai-blog'),
+    path('api/ai/generate-title/', views.generate_ai_title, name='generate-ai-title'),
+    path('api/ai/generate-content/', views.generate_ai_content, name='generate-ai-content'),
+    path('api/ai/rewrite-content/', views.rewrite_ai_content, name='rewrite-ai-content'),
     
     # User-specific endpoints
     path('api/user/saved-blogs/', views.user_saved_blogs, name='user-saved-blogs'),

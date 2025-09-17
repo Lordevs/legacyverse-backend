@@ -59,8 +59,8 @@ class LikeSerializer(serializers.ModelSerializer):
 class BlogSerializer(serializers.ModelSerializer):
     """Serializer for blog posts"""
     author = UserSerializer(read_only=True)
-    comments_count = serializers.ReadOnlyField()
-    likes_count = serializers.ReadOnlyField()
+    comments_count = serializers.IntegerField(read_only=True)
+    likes_count = serializers.IntegerField(read_only=True)
     is_liked_by_user = serializers.SerializerMethodField()
     is_saved_by_user = serializers.SerializerMethodField()
     comments = CommentSerializer(many=True, read_only=True)
@@ -97,7 +97,7 @@ class BlogCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Blog
         fields = [
-            'title', 'content', 'status', 'content_source', 'ai_prompt',
+            'id', 'title', 'content', 'status', 'content_source', 'ai_prompt',
             'excerpt', 'tags'
         ]
     
@@ -173,8 +173,8 @@ class BlogViewSerializer(serializers.ModelSerializer):
 class BlogListSerializer(serializers.ModelSerializer):
     """Simplified serializer for blog lists"""
     author = UserSerializer(read_only=True)
-    comments_count = serializers.ReadOnlyField()
-    likes_count = serializers.ReadOnlyField()
+    comments_count = serializers.IntegerField(read_only=True)
+    likes_count = serializers.IntegerField(read_only=True)
     
     class Meta:
         model = Blog
@@ -197,4 +197,90 @@ class AIBlogGenerationSerializer(serializers.Serializer):
     def validate_prompt(self, value):
         if len(value.strip()) < 10:
             raise serializers.ValidationError("Prompt must be at least 10 characters long")
+        return value.strip()
+
+
+class AITitleGenerationSerializer(serializers.Serializer):
+    """Serializer for AI title generation requests"""
+    prompt = serializers.CharField(max_length=1000, min_length=5)
+    content = serializers.CharField(max_length=10000, required=False, allow_blank=True)
+    tone = serializers.ChoiceField(
+        choices=[
+            ('professional', 'Professional'),
+            ('casual', 'Casual'),
+            ('creative', 'Creative'),
+            ('informative', 'Informative'),
+            ('engaging', 'Engaging')
+        ],
+        default='professional',
+        required=False
+    )
+    
+    def validate_prompt(self, value):
+        if len(value.strip()) < 5:
+            raise serializers.ValidationError("Prompt must be at least 5 characters long")
+        return value.strip()
+
+
+class AIContentGenerationSerializer(serializers.Serializer):
+    """Serializer for AI content generation requests"""
+    prompt = serializers.CharField(max_length=1000, min_length=10)
+    title = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    tone = serializers.ChoiceField(
+        choices=[
+            ('professional', 'Professional'),
+            ('casual', 'Casual'),
+            ('creative', 'Creative'),
+            ('informative', 'Informative'),
+            ('engaging', 'Engaging')
+        ],
+        default='professional',
+        required=False
+    )
+    length = serializers.ChoiceField(
+        choices=[
+            ('short', 'Short (300-500 words)'),
+            ('medium', 'Medium (500-1000 words)'),
+            ('long', 'Long (1000+ words)')
+        ],
+        default='medium',
+        required=False
+    )
+    
+    def validate_prompt(self, value):
+        if len(value.strip()) < 10:
+            raise serializers.ValidationError("Prompt must be at least 10 characters long")
+        return value.strip()
+
+
+class AIContentRewriteSerializer(serializers.Serializer):
+    """Serializer for AI content rewriting requests"""
+    content = serializers.CharField(max_length=10000, min_length=20)
+    instruction = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    tone = serializers.ChoiceField(
+        choices=[
+            ('professional', 'Professional'),
+            ('casual', 'Casual'),
+            ('creative', 'Creative'),
+            ('informative', 'Informative'),
+            ('engaging', 'Engaging')
+        ],
+        default='professional',
+        required=False
+    )
+    style = serializers.ChoiceField(
+        choices=[
+            ('improve_clarity', 'Improve Clarity'),
+            ('make_engaging', 'Make More Engaging'),
+            ('simplify', 'Simplify Language'),
+            ('professional', 'Make More Professional'),
+            ('casual', 'Make More Casual')
+        ],
+        default='improve_clarity',
+        required=False
+    )
+    
+    def validate_content(self, value):
+        if len(value.strip()) < 20:
+            raise serializers.ValidationError("Content must be at least 20 characters long")
         return value.strip()

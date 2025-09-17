@@ -68,15 +68,6 @@ class Blog(models.Model):
             counter += 1
         return slug
     
-    @property
-    def likes_count(self):
-        """Get the number of likes for this blog"""
-        return self.likes.filter(is_liked=True).count()
-    
-    @property
-    def comments_count(self):
-        """Get the number of comments for this blog"""
-        return self.comments.count()
     
     @property
     def is_published(self):

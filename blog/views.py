@@ -7,7 +7,7 @@ from django.db.models import Q, Count
 from django.utils import timezone
 from django.http import Http404
 from django.conf import settings
-import openai
+from openai import OpenAI
 import logging
 
 from .models import Blog, Comment, Like, SavedBlog, BlogView
@@ -15,10 +15,13 @@ from .serializers import (
     BlogSerializer, BlogCreateSerializer, BlogUpdateSerializer, 
     BlogListSerializer, CommentSerializer, CommentCreateSerializer,
     LikeSerializer, SavedBlogSerializer, BlogViewSerializer,
-    AIBlogGenerationSerializer
+    AIBlogGenerationSerializer, AITitleGenerationSerializer,
+    AIContentGenerationSerializer, AIContentRewriteSerializer
 )
 
 logger = logging.getLogger(__name__)
+
+client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
 class BlogViewSet(ModelViewSet):
@@ -113,7 +116,7 @@ class BlogViewSet(ModelViewSet):
         
         return Response({
             'is_liked': like.is_liked,
-            'likes_count': blog.likes_count
+            'likes_count': blog.likes.filter(is_liked=True).count()
         })
     
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
@@ -210,8 +213,8 @@ def generate_ai_blog(request):
     
     try:
         # Initialize OpenAI client
-        openai.api_key = getattr(settings, 'OPENAI_API_KEY', None)
-        if not openai.api_key:
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        if not client:
             return Response(
                 {'error': 'OpenAI API key not configured'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -232,7 +235,7 @@ def generate_ai_blog(request):
             user_prompt = f"Rewrite this content to make it better: {prompt}"
         
         # Generate content using OpenAI
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -242,12 +245,12 @@ def generate_ai_blog(request):
             temperature=0.7
         )
         
-        generated_content = response.choices[0].message.content
+        generated_content = response.choices[0].message.content.strip() if response.choices[0].message.content else ''
         
         # Extract title if not provided
         if not title and content_source == 'ai_generated':
             # Try to extract title from generated content
-            lines = generated_content.split('\n')
+            lines = generated_content.split('\n') if generated_content else []
             for line in lines:
                 if line.strip() and not line.startswith('#') and len(line.strip()) < 100:
                     title = line.strip()
@@ -264,6 +267,252 @@ def generate_ai_blog(request):
         logger.error(f"OpenAI API error: {str(e)}")
         return Response(
             {'error': 'Failed to generate content. Please try again.'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def generate_ai_title(request):
+    """
+    Generate blog title using OpenAI
+    """
+    serializer = AITitleGenerationSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Initialize OpenAI client
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        if not client:
+            return Response(
+                {'error': 'OpenAI API key not configured'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        prompt = serializer.validated_data['prompt']
+        content = serializer.validated_data.get('content', '')
+        tone = serializer.validated_data.get('tone', 'professional')
+        
+        # Create system prompt based on tone
+        tone_instructions = {
+            'professional': 'professional and authoritative',
+            'casual': 'casual and friendly',
+            'creative': 'creative and engaging',
+            'informative': 'informative and educational',
+            'engaging': 'engaging and compelling'
+        }
+        
+        system_prompt = f"""You are a professional blog title generator. Create a {tone_instructions.get(tone, 'professional')} blog title based on the user's prompt. 
+        The title should be:
+        - Catchy and attention-grabbing
+        - SEO-friendly
+        - Between 40-60 characters
+        - Clear and descriptive
+        - Appropriate for the {tone} tone
+        
+        Return only the title, no additional text."""
+        
+        user_prompt = f"Generate a blog title for: {prompt}"
+        if content:
+            user_prompt += f"\n\nContent context: {content[:500]}..."
+        
+        # Generate title using OpenAI
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            max_tokens=100,
+            temperature=0.8
+        )
+        
+        generated_title = response.choices[0].message.content.strip() if response.choices[0].message.content else ''
+        
+        return Response({
+            'title': generated_title,
+            'tone': tone,
+            'original_prompt': prompt
+        })
+        
+    except Exception as e:
+        logger.error(f"OpenAI API error for title generation: {str(e)}")
+        return Response(
+            {'error': 'Failed to generate title. Please try again.'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def generate_ai_content(request):
+    """
+    Generate blog content using OpenAI
+    """
+    serializer = AIContentGenerationSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Initialize OpenAI client
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        if not client:
+            return Response(
+                {'error': 'OpenAI API key not configured'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        prompt = serializer.validated_data['prompt']
+        title = serializer.validated_data.get('title', '')
+        tone = serializer.validated_data.get('tone', 'professional')
+        length = serializer.validated_data.get('length', 'medium')
+        
+        # Create system prompt based on tone and length
+        tone_instructions = {
+            'professional': 'professional and authoritative',
+            'casual': 'casual and friendly',
+            'creative': 'creative and engaging',
+            'informative': 'informative and educational',
+            'engaging': 'engaging and compelling'
+        }
+        
+        length_instructions = {
+            'short': '300-500 words',
+            'medium': '500-1000 words',
+            'long': '1000+ words'
+        }
+        
+        system_prompt = f"""You are a professional blog writer. Create an engaging, well-structured blog post based on the user's prompt. 
+        The blog should be:
+        - {tone_instructions.get(tone, 'professional')} in tone
+        - Approximately {length_instructions.get(length, '500-1000 words')} in length
+        - Well-organized with clear headings and subheadings
+        - Informative and valuable to readers
+        - Written in a {tone} style
+        
+        Structure the content with proper headings (use ## for main headings, ### for subheadings) and make it engaging and easy to read."""
+        
+        user_prompt = f"Write a blog post about: {prompt}"
+        if title:
+            user_prompt += f"\n\nTitle: {title}"
+        
+        # Adjust max_tokens based on length
+        max_tokens_map = {
+            'short': 1000,
+            'medium': 2000,
+            'long': 3000
+        }
+        
+        # Generate content using OpenAI
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            max_tokens=max_tokens_map.get(length, 2000),
+            temperature=0.7
+        )
+        
+        generated_content = response.choices[0].message.content.strip() if response.choices[0].message.content else ''
+        
+        return Response({
+            'content': generated_content,
+            'title': title,
+            'tone': tone,
+            'length': length,
+            'original_prompt': prompt
+        })
+        
+    except Exception as e:
+        logger.error(f"OpenAI API error for content generation: {str(e)}")
+        return Response(
+            {'error': 'Failed to generate content. Please try again.'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def rewrite_ai_content(request):
+    """
+    Rewrite existing content using OpenAI
+    """
+    serializer = AIContentRewriteSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Initialize OpenAI client
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        if not client:
+            return Response(
+                {'error': 'OpenAI API key not configured'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        content = serializer.validated_data['content']
+        instruction = serializer.validated_data.get('instruction', '')
+        tone = serializer.validated_data.get('tone', 'professional')
+        style = serializer.validated_data.get('style', 'improve_clarity')
+        
+        # Create system prompt based on style and tone
+        tone_instructions = {
+            'professional': 'professional and authoritative',
+            'casual': 'casual and friendly',
+            'creative': 'creative and engaging',
+            'informative': 'informative and educational',
+            'engaging': 'engaging and compelling'
+        }
+        
+        style_instructions = {
+            'improve_clarity': 'improve clarity and readability while maintaining the original meaning',
+            'make_engaging': 'make it more engaging and compelling to read',
+            'simplify': 'simplify the language and make it more accessible',
+            'professional': 'make it more professional and formal',
+            'casual': 'make it more casual and conversational'
+        }
+        
+        system_prompt = f"""You are a professional content editor. Rewrite the provided content to {style_instructions.get(style, 'improve clarity')}. 
+        The rewritten content should be:
+        - {tone_instructions.get(tone, 'professional')} in tone
+        - Well-structured and easy to read
+        - Maintain the original meaning and key points
+        - Improved in terms of {style}
+        - Engaging and valuable to readers
+        
+        Preserve the original structure and formatting where appropriate, but improve the overall quality."""
+        
+        user_prompt = f"Rewrite this content:\n\n{content}"
+        if instruction:
+            user_prompt += f"\n\nAdditional instruction: {instruction}"
+        
+        # Generate rewritten content using OpenAI
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            max_tokens=3000,
+            temperature=0.6
+        )
+        
+        rewritten_content = response.choices[0].message.content.strip() if response.choices[0].message.content else ''
+        
+        return Response({
+            'rewritten_content': rewritten_content,
+            'original_content': content,
+            'tone': tone,
+            'style': style,
+            'instruction': instruction
+        })
+        
+    except Exception as e:
+        logger.error(f"OpenAI API error for content rewriting: {str(e)}")
+        return Response(
+            {'error': 'Failed to rewrite content. Please try again.'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
