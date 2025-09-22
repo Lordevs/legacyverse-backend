@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from .models import User, Profile, PasswordResetToken
+from .models import User, Profile, PasswordResetToken, ChildhoodImage
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -73,6 +73,16 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'username', 'is_verified', 'created_at')
 
 
+class ChildhoodImageSerializer(serializers.ModelSerializer):
+    """
+    Serializer for childhood images
+    """
+    class Meta:
+        model = ChildhoodImage
+        fields = ('id', 'image', 'caption', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+
 class ProfileSerializer(serializers.ModelSerializer):
     """
     Serializer for user profile
@@ -80,15 +90,42 @@ class ProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
     fullname = serializers.CharField(source='user.fullname', read_only=True)
+    childhood_images = ChildhoodImageSerializer(many=True, read_only=True)
     
     class Meta:
         model = Profile
         fields = (
             'username', 'email', 'fullname', 'image', 'bio', 'location', 
-            'website', 'education', 'hobbies', 'early_childhood', 
+            'website', 'education', 'hobbies', 'early_childhood',
+            'joined_date', 'childhood_images', 'family_json', 'community_json',
+            'professional_experience_json', 'accomplishment_json',
             'created_at', 'updated_at'
         )
         read_only_fields = ('created_at', 'updated_at')
+    
+    def validate_family_json(self, value):
+        """Validate that family_json is a valid dict"""
+        if value is not None and not isinstance(value, dict):
+            raise serializers.ValidationError("Family JSON must be a valid dictionary")
+        return value
+    
+    def validate_community_json(self, value):
+        """Validate that community_json is a valid dict"""
+        if value is not None and not isinstance(value, dict):
+            raise serializers.ValidationError("Community JSON must be a valid dictionary")
+        return value
+    
+    def validate_professional_experience_json(self, value):
+        """Validate that professional_experience_json is a valid dict"""
+        if value is not None and not isinstance(value, dict):
+            raise serializers.ValidationError("Professional experience JSON must be a valid dictionary")
+        return value
+    
+    def validate_accomplishment_json(self, value):
+        """Validate that accomplishment_json is a valid dict"""
+        if value is not None and not isinstance(value, dict):
+            raise serializers.ValidationError("Accomplishment JSON must be a valid dictionary")
+        return value
     
     def update(self, instance, validated_data):
         # Update user fullname if provided
@@ -108,6 +145,58 @@ class ProfileImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = ('image',)
+
+
+class ChildhoodImageUploadSerializer(serializers.ModelSerializer):
+    """
+    Serializer for uploading childhood images
+    """
+    class Meta:
+        model = ChildhoodImage
+        fields = ('image', 'caption')
+
+
+class BulkChildhoodImageUploadSerializer(serializers.Serializer):
+    """
+    Serializer for bulk uploading childhood images
+    """
+    images = serializers.ListField(
+        child=serializers.ImageField(), 
+        allow_empty=False,
+        max_length=10,  # Limit to 10 images at once
+        help_text="List of childhood images to upload"
+    )
+    captions = serializers.ListField(
+        child=serializers.CharField(max_length=200, required=False, allow_blank=True),
+        required=False,
+        help_text="Optional captions for the images"
+    )
+    
+    def to_internal_value(self, data):
+        # Handle captions when sent as JSON string in form data
+        import json
+        
+        if 'captions' in data and isinstance(data['captions'], str):
+            try:
+                data = data.copy()  # Make data mutable
+                data['captions'] = json.loads(data['captions'])
+            except (json.JSONDecodeError, ValueError):
+                # If it's not valid JSON, treat it as a single caption
+                data = data.copy()
+                data['captions'] = [data['captions']]
+        
+        return super().to_internal_value(data)
+    
+    def validate(self, data):
+        images = data.get('images', [])
+        captions = data.get('captions', [])
+        
+        if captions and len(captions) != len(images):
+            raise serializers.ValidationError(
+                "If captions are provided, the number of captions must match the number of images"
+            )
+        
+        return data
 
 
 class PasswordChangeSerializer(serializers.Serializer):

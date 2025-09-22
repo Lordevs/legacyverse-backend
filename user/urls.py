@@ -16,5 +16,13 @@ urlpatterns = [
     path('profile/', views.ProfileDetailView.as_view(), name='profile_detail'),
     path('profile/image/', views.update_profile_image, name='update_profile_image'),
     path('profile/image/delete/', views.delete_profile_image, name='delete_profile_image'),
+    
+    # Childhood Images URLs (put before username pattern to avoid conflicts)
+    path('profile/childhood-images/', views.childhood_images_view, name='childhood_images'),
+    path('profile/childhood-images/<int:image_id>/', views.update_childhood_image, name='update_childhood_image'),
+    path('profile/childhood-images/<int:image_id>/delete/', views.delete_childhood_image, name='delete_childhood_image'),
+    path('profile/childhood-images/delete-all/', views.delete_all_childhood_images, name='delete_all_childhood_images'),
+    
+    # Username pattern should be last to avoid conflicts
     path('profile/<str:username>/', views.get_profile_by_username, name='profile_by_username'),
 ]
