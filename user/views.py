@@ -174,7 +174,7 @@ def change_password_view(request):
 
 
 @api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.AllowAny])
 def refresh_token_view(request):
     """
     Refresh JWT token endpoint
