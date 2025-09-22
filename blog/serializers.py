@@ -17,18 +17,24 @@ class CommentSerializer(serializers.ModelSerializer):
     """Serializer for blog comments"""
     author = UserSerializer(read_only=True)
     replies_count = serializers.SerializerMethodField()
-    
+    replies = serializers.SerializerMethodField()
+
     class Meta:
         model = Comment
         fields = [
-            'id', 'content', 'author', 'parent_comment', 
-            'created_at', 'updated_at', 'is_approved', 
-            'is_edited', 'replies_count'
+            'id', 'content', 'author', 'parent_comment',
+            'created_at', 'updated_at', 'is_approved',
+            'is_edited', 'replies_count', 'replies'
         ]
         read_only_fields = ['id', 'author', 'created_at', 'updated_at']
-    
+
     def get_replies_count(self, obj):
         return obj.replies.count()
+
+    def get_replies(self, obj):
+        # Only direct replies, not recursive
+        replies_qs = obj.replies.all().select_related('author')
+        return CommentSerializer(replies_qs, many=True, context=self.context).data
 
 
 class CommentCreateSerializer(serializers.ModelSerializer):
