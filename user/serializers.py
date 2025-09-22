@@ -96,12 +96,18 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = (
             'username', 'email', 'fullname', 'image', 'bio', 'location', 
-            'website', 'education', 'hobbies', 'early_childhood',
+            'website', 'education_json', 'hobbies', 'early_childhood',
             'joined_date', 'childhood_images', 'family_json', 'community_json',
             'professional_experience_json', 'accomplishment_json',
             'created_at', 'updated_at'
         )
         read_only_fields = ('created_at', 'updated_at')
+
+    def validate_education_json(self, value):
+        """Validate that education_json is a valid dict"""
+        if value is not None and not isinstance(value, dict):
+            raise serializers.ValidationError("Education JSON must be a valid dictionary")
+        return value
     
     def validate_family_json(self, value):
         """Validate that family_json is a valid dict"""

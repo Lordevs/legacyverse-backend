@@ -102,7 +102,7 @@ class Profile(models.Model):
     bio = models.TextField(max_length=500, blank=True)
     location = models.CharField(max_length=100, blank=True)
     website = models.URLField(blank=True)
-    education = models.TextField(max_length=500, blank=True)
+    education_json = models.JSONField(default=dict, blank=True, help_text="Education information in JSON format")
     hobbies = models.TextField(max_length=500, blank=True)
     early_childhood = models.TextField(max_length=1000, blank=True)
     

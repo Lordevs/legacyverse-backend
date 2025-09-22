@@ -49,7 +49,7 @@ class ProfileAdmin(admin.ModelAdmin):
             'fields': ('user', 'image', 'bio', 'location', 'website', 'joined_date')
         }),
         ('Life Details', {
-            'fields': ('education', 'hobbies', 'early_childhood')
+            'fields': ('education_json', 'hobbies', 'early_childhood')
         }),
         ('JSON Data', {
             'fields': ('family_json', 'community_json', 'professional_experience_json', 'accomplishment_json'),
