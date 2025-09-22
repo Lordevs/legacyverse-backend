@@ -44,9 +44,10 @@ class BlogViewSet(ModelViewSet):
             'likes', 'comments', 'saved_by_users'
         ).annotate(
             likes_count=Count('likes', filter=Q(likes__is_liked=True)),
-            comments_count=Count('comments')
+            comments_count=Count('comments'),
+            views_count=Count('views', distinct=True)
         )
-        
+
         # Filter by status for public access
         if not self.request.user.is_authenticated:
             queryset = queryset.filter(status='public')
@@ -55,34 +56,34 @@ class BlogViewSet(ModelViewSet):
             queryset = queryset.filter(
                 Q(status='public') | Q(author=self.request.user)
             )
-        
+
         # Filter by author if specified
         author_id = self.request.query_params.get('author')
         if author_id:
             queryset = queryset.filter(author_id=author_id)
-        
+
         # Filter by status
         status_filter = self.request.query_params.get('status')
         if status_filter:
             queryset = queryset.filter(status=status_filter)
-        
+
         # Filter by tags
         tags = self.request.query_params.get('tags')
         if tags:
             tag_list = [tag.strip() for tag in tags.split(',')]
             for tag in tag_list:
                 queryset = queryset.filter(tags__icontains=tag)
-        
+
         # Search functionality
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(
-                Q(title__icontains=search) | 
-                Q(content__icontains=search) | 
+                Q(title__icontains=search) |
+                Q(content__icontains=search) |
                 Q(excerpt__icontains=search) |
                 Q(tags__icontains=search)
             )
-        
+
         return queryset.order_by('-created_at')
     
     def perform_create(self, serializer):

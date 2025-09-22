@@ -61,6 +61,7 @@ class BlogSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
     comments_count = serializers.IntegerField(read_only=True)
     likes_count = serializers.IntegerField(read_only=True)
+    views_count = serializers.IntegerField(read_only=True)
     is_liked_by_user = serializers.SerializerMethodField()
     is_saved_by_user = serializers.SerializerMethodField()
     comments = CommentSerializer(many=True, read_only=True)
@@ -70,12 +71,12 @@ class BlogSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'content', 'author', 'status', 'content_source',
             'ai_prompt', 'created_at', 'updated_at', 'published_at', 'slug',
-            'excerpt', 'tags', 'comments_count', 'likes_count', 
+            'excerpt', 'tags', 'comments_count', 'likes_count', 'views_count',
             'is_liked_by_user', 'is_saved_by_user', 'comments'
         ]
         read_only_fields = [
             'id', 'author', 'created_at', 'updated_at', 'published_at', 
-            'slug', 'comments_count', 'likes_count'
+            'slug', 'comments_count', 'likes_count', 'views_count'
         ]
     
     def get_is_liked_by_user(self, obj):
@@ -175,13 +176,14 @@ class BlogListSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
     comments_count = serializers.IntegerField(read_only=True)
     likes_count = serializers.IntegerField(read_only=True)
+    views_count = serializers.IntegerField(read_only=True)
     
     class Meta:
         model = Blog
         fields = [
             'id', 'title', 'excerpt', 'author', 'status', 'content_source',
             'created_at', 'updated_at', 'published_at', 'slug', 'tags',
-            'comments_count', 'likes_count'
+            'comments_count', 'likes_count', 'views_count'
         ]
 
 

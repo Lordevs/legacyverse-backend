@@ -235,6 +235,19 @@ GET /api/blogs/{id}/track_view/
   "viewed": true
 }
 ```
+(The endpoint {{api_base}}/blogs/{{blog_id}}/track_view/ is used to track a view (i.e., a "visit" or "read") of a specific blog post for analytics purposes.
+
+What it does:
+When a user (must be authenticated) makes a GET request to this endpoint:
+It gets the blog with the given blog_id.
+It determines the user's IP address.
+It creates a new BlogView record for this user and blog (if one does not already exist for this user/blog combination and IP).
+It returns whether a new view record was created ({'viewed': true} if this is the first view, otherwise {'viewed': false}).
+Purpose:
+This endpoint is for tracking unique views of a blog post by users (and optionally by IP).
+It is used for analytics, so you can count how many times a blog has been viewed.
+In summary:
+This endpoint is for tracking and counting blog views for analytics, not for returning the blog content itself.)
 
 ### Comment Endpoints
 
