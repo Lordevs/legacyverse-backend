@@ -36,7 +36,7 @@ class Blog(models.Model):
     
     # SEO and metadata
     slug = models.SlugField(max_length=200, unique=True, blank=True)
-    excerpt = models.TextField(max_length=300, blank=True, help_text="Brief description of the blog")
+    excerpt = models.TextField(blank=True, help_text="Brief description of the blog")
     tags = models.CharField(max_length=500, blank=True, help_text="Comma-separated tags")
     
     class Meta:
