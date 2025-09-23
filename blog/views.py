@@ -81,7 +81,8 @@ class BlogViewSet(ModelViewSet):
                 Q(title__icontains=search) |
                 Q(content__icontains=search) |
                 Q(excerpt__icontains=search) |
-                Q(tags__icontains=search)
+                Q(tags__icontains=search) |
+                Q(author__fullname__icontains=search)
             )
 
         return queryset.order_by('-created_at')
