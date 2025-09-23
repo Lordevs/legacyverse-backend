@@ -37,5 +37,5 @@ urlpatterns = [
     path('api/user/blogs/', views.user_blogs, name='user-blogs'),
     
     # SEO-friendly blog URLs
-    path('blog/<slug:slug>/', views.blog_detail_by_slug, name='blog-detail-slug'),
+    path('api/blog/<slug:slug>/', views.blog_detail_by_slug, name='blog-detail-slug'),
 ]
