@@ -598,30 +598,31 @@ def blog_detail_by_slug(request, slug):
             likes_count=Count('likes', filter=Q(likes__is_liked=True)),
             comments_count=Count('comments')
         ).get(slug=slug)
-        
-        # Check if user can view this blog
-        if blog.status != 'public' and (
-            not request.user.is_authenticated or 
-            blog.author != request.user
-        ):
-            raise Http404("Blog not found")
-        
-        # Track view
-        if request.user.is_authenticated:
-            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-            if x_forwarded_for:
-                ip_address = x_forwarded_for.split(',')[0]
-            else:
-                ip_address = request.META.get('REMOTE_ADDR')
-            
-            BlogView.objects.get_or_create(
-                blog=blog,
-                user=request.user,
-                defaults={'ip_address': ip_address}
-            )
-        
-        serializer = BlogSerializer(blog, context={'request': request})
-        return Response(serializer.data)
-        
     except Blog.DoesNotExist:
         raise Http404("Blog not found")
+
+    # Check if user can view this blog
+    if blog.status != 'public' and (
+        not request.user.is_authenticated or 
+        blog.author != request.user
+    ):
+        raise Http404("Blog not found")
+
+    # Track view
+    if request.user.is_authenticated:
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip_address = x_forwarded_for.split(',')[0]
+        else:
+            ip_address = request.META.get('REMOTE_ADDR')
+        BlogView.objects.get_or_create(
+            blog=blog,
+            user=request.user,
+            defaults={'ip_address': ip_address}
+        )
+
+    from .serializers import BlogDetailSerializer
+    # Use BlogDetailSerializer to exclude comments and include views_count
+    blog.views_count = blog.views.count()
+    serializer = BlogDetailSerializer(blog, context={'request': request})
+    return Response(serializer.data)

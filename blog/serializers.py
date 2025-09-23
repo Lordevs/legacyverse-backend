@@ -5,7 +5,6 @@ from .models import Blog, Comment, Like, SavedBlog, BlogView
 User = get_user_model()
 
 
-
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for user information in blog contexts, with profile image"""
     profile_image = serializers.SerializerMethodField()
@@ -25,6 +24,42 @@ class UserSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(image_url)
             return image_url
         return None
+
+
+# Blog detail serializer for slug endpoint (no comments, with views_count)
+class BlogDetailSerializer(serializers.ModelSerializer):
+    author = UserSerializer(read_only=True)
+    comments_count = serializers.IntegerField(read_only=True)
+    likes_count = serializers.IntegerField(read_only=True)
+    views_count = serializers.IntegerField(read_only=True)
+    is_liked_by_user = serializers.SerializerMethodField()
+    is_saved_by_user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Blog
+        fields = [
+            'id', 'title', 'content', 'author', 'status', 'content_source',
+            'ai_prompt', 'created_at', 'updated_at', 'published_at', 'slug',
+            'excerpt', 'tags', 'comments_count', 'likes_count', 'views_count',
+            'is_liked_by_user', 'is_saved_by_user'
+        ]
+        read_only_fields = [
+            'id', 'author', 'created_at', 'updated_at', 'published_at',
+            'slug', 'comments_count', 'likes_count', 'views_count'
+        ]
+
+    def get_is_liked_by_user(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            like = obj.likes.filter(user=request.user, is_liked=True).first()
+            return like is not None
+        return False
+
+    def get_is_saved_by_user(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.saved_by_users.filter(user=request.user).exists()
+        return False
 
 
 class CommentSerializer(serializers.ModelSerializer):
