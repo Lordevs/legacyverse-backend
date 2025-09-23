@@ -43,8 +43,8 @@ class BlogViewSet(ModelViewSet):
         queryset = Blog.objects.select_related('author').prefetch_related(
             'likes', 'comments', 'saved_by_users'
         ).annotate(
-            likes_count=Count('likes', filter=Q(likes__is_liked=True)),
-            comments_count=Count('comments'),
+            likes_count=Count('likes', filter=Q(likes__is_liked=True), distinct=True),
+            comments_count=Count('comments', distinct=True),
             views_count=Count('views', distinct=True)
         )
 
