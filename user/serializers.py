@@ -73,14 +73,26 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'username', 'is_verified', 'created_at')
 
 
+
 class ChildhoodImageSerializer(serializers.ModelSerializer):
     """
-    Serializer for childhood images
+    Serializer for childhood images with absolute image URL
     """
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = ChildhoodImage
         fields = ('id', 'image', 'caption', 'created_at')
         read_only_fields = ('id', 'created_at')
+
+    def get_image(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            image_url = obj.image.url
+            if request is not None:
+                return request.build_absolute_uri(image_url)
+            return image_url
+        return None
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -90,18 +102,34 @@ class ProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
     fullname = serializers.CharField(source='user.fullname', read_only=True)
-    childhood_images = ChildhoodImageSerializer(many=True, read_only=True)
+    id = serializers.UUIDField(source='user.id', read_only=True)
+    def get_childhood_images(self, obj):
+        # Pass context to ensure absolute URLs
+        serializer = ChildhoodImageSerializer(obj.childhood_images.all(), many=True, context=self.context)
+        return serializer.data
+
+    childhood_images = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
     
     class Meta:
         model = Profile
         fields = (
-            'username', 'email', 'fullname', 'image', 'bio', 'location', 
+            'id', 'username', 'email', 'fullname', 'image', 'bio', 'location', 
             'website', 'education_json', 'hobbies', 'early_childhood',
             'joined_date', 'childhood_images', 'family_json', 'community_json',
             'professional_experience_json', 'accomplishment_json',
             'created_at', 'updated_at'
         )
-        read_only_fields = ('created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def get_image(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            image_url = obj.image.url
+            if request is not None:
+                return request.build_absolute_uri(image_url)
+            return image_url
+        return None
 
     def validate_education_json(self, value):
         """Validate that education_json is a valid dict"""

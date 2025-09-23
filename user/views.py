@@ -215,7 +215,7 @@ def get_profile_by_username(request, username):
     try:
         user = User.objects.get(username=username)
         profile, created = Profile.objects.get_or_create(user=user)
-        serializer = ProfileSerializer(profile)
+        serializer = ProfileSerializer(profile, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
