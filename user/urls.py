@@ -25,4 +25,8 @@ urlpatterns = [
     
     # Username pattern should be last to avoid conflicts
     path('profile/<str:username>/', views.get_profile_by_username, name='profile_by_username'),
+
+    # User details by username
+    path('by-username/<str:username>/', views.get_user_by_username, name='get-user-by-username'),
+
 ]

@@ -361,3 +361,21 @@ def delete_all_childhood_images(request):
     
     except Profile.DoesNotExist:
         return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# Get user details by username
+from .serializers import UserSerializer
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def get_user_by_username(request, username):
+    """
+    Get user details by username (public endpoint)
+    """
+    from .models import User
+    try:
+        user = User.objects.get(username=username)
+        serializer = UserSerializer(user, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
