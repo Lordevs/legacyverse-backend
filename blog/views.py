@@ -532,6 +532,7 @@ def user_saved_blogs(request):
     return Response(serializer.data)
 
 
+
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def user_blogs(request):
@@ -542,8 +543,37 @@ def user_blogs(request):
         likes_count=Count('likes', filter=Q(likes__is_liked=True)),
         comments_count=Count('comments')
     ).order_by('-created_at')
-    
     serializer = BlogSerializer(blogs, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+# Blog stats endpoint
+from .serializers import BlogStatsSerializer
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def user_blog_stats(request):
+    """
+    Get blog stats for the authenticated user
+    """
+    blogs = Blog.objects.filter(author=request.user)
+    total_blogs = blogs.count()
+    # Status-wise count
+    status_counts = blogs.values('status').annotate(count=Count('id'))
+    status_dict = {item['status']: item['count'] for item in status_counts}
+    # Views per blog
+    views_per_blog = {}
+    for blog in blogs:
+        views_per_blog[str(blog.id)] = blog.views.count()
+    # Total views
+    total_views = sum(views_per_blog.values())
+    data = {
+        'total_blogs': total_blogs,
+        'status_counts': status_dict,
+        'views_per_blog': views_per_blog,
+        'total_views': total_views
+    }
+    serializer = BlogStatsSerializer(data)
     return Response(serializer.data)
 
 

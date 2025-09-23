@@ -35,6 +35,7 @@ urlpatterns = [
     # User-specific endpoints
     path('api/user/saved-blogs/', views.user_saved_blogs, name='user-saved-blogs'),
     path('api/user/blogs/', views.user_blogs, name='user-blogs'),
+    path('api/user/blog-stats/', views.user_blog_stats, name='user-blog-stats'),
     
     # SEO-friendly blog URLs
     path('api/blog/<slug:slug>/', views.blog_detail_by_slug, name='blog-detail-slug'),

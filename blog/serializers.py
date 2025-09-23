@@ -5,12 +5,26 @@ from .models import Blog, Comment, Like, SavedBlog, BlogView
 User = get_user_model()
 
 
+
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for user information in blog contexts"""
+    """Serializer for user information in blog contexts, with profile image"""
+    profile_image = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'fullname', 'email', 'username']
+        fields = ['id', 'fullname', 'email', 'username', 'profile_image']
         read_only_fields = ['id', 'username']
+
+    def get_profile_image(self, obj):
+        # Assumes User has a related Profile with an image field
+        profile = getattr(obj, 'profile', None)
+        if profile and profile.image:
+            request = self.context.get('request')
+            image_url = profile.image.url
+            if request is not None:
+                return request.build_absolute_uri(image_url)
+            return image_url
+        return None
 
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -309,3 +323,11 @@ class AIContentRewriteSerializer(serializers.Serializer):
         if len(value.strip()) < 20:
             raise serializers.ValidationError("Content must be at least 20 characters long")
         return value.strip()
+    
+
+# Blog stats serializer
+class BlogStatsSerializer(serializers.Serializer):
+    total_blogs = serializers.IntegerField()
+    status_counts = serializers.DictField(child=serializers.IntegerField())
+    views_per_blog = serializers.DictField(child=serializers.IntegerField())
+    total_views = serializers.IntegerField()
