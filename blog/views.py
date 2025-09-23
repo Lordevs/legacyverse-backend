@@ -173,10 +173,18 @@ class CommentViewSet(ModelViewSet):
     def get_queryset(self):
         blog_id = self.kwargs.get('blog_pk')
         if blog_id:
-            return Comment.objects.filter(
-                blog_id=blog_id,
-                parent_comment__isnull=True  # Only top-level comments
-            ).select_related('author').prefetch_related('replies__author').order_by('-created_at')
+            # If 'pk' is present, retrieve the specific comment (parent or child)
+            comment_pk = self.kwargs.get('pk')
+            if comment_pk:
+                return Comment.objects.filter(blog_id=blog_id, pk=comment_pk).select_related('author').prefetch_related('replies__author')
+            # Otherwise, list all comments for the blog (top-level only for list action)
+            if self.action == 'list':
+                return Comment.objects.filter(
+                    blog_id=blog_id,
+                    parent_comment__isnull=True
+                ).select_related('author').prefetch_related('replies__author').order_by('-created_at')
+            # For retrieve/update/destroy, allow any comment (parent or child)
+            return Comment.objects.filter(blog_id=blog_id).select_related('author').prefetch_related('replies__author')
         return Comment.objects.none()
     
     def get_serializer_context(self):
