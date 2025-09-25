@@ -1,6 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
+from .google_auth import google_auth_view, google_oauth_url, google_oauth_callback
 
 urlpatterns = [
     # Authentication URLs
@@ -11,6 +12,9 @@ urlpatterns = [
     path('auth/forgot-password/', views.forgot_password_view, name='forgot_password'),
     path('auth/reset-password/', views.reset_password_view, name='reset_password'),
     path('auth/change-password/', views.change_password_view, name='change_password'),
+    path('auth/google/', google_auth_view, name='google_auth'),
+    path('auth/google/url/', google_oauth_url, name='google_oauth_url'),
+    path('auth/google/callback/', google_oauth_callback, name='google_oauth_callback'),
     
     # Profile URLs
     path('profile/', views.ProfileDetailView.as_view(), name='profile_detail'),
