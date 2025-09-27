@@ -102,9 +102,17 @@ class Profile(models.Model):
     bio = models.TextField(max_length=500, blank=True)
     location = models.CharField(max_length=100, blank=True)
     website = models.URLField(blank=True)
-    education = models.TextField(max_length=500, blank=True)
+    education_json = models.JSONField(default=dict, blank=True, help_text="Education information in JSON format")
     hobbies = models.TextField(max_length=500, blank=True)
     early_childhood = models.TextField(max_length=1000, blank=True)
+    
+    # New fields as requested
+    joined_date = models.DateField(null=True, blank=True, help_text="User-provided joined date")
+    family_json = models.JSONField(default=dict, blank=True, help_text="Family information in JSON format")
+    community_json = models.JSONField(default=dict, blank=True, help_text="Community information in JSON format")
+    professional_experience_json = models.JSONField(default=dict, blank=True, help_text="Professional experience in JSON format")
+    accomplishment_json = models.JSONField(default=dict, blank=True, help_text="Accomplishments in JSON format")
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -115,6 +123,22 @@ class Profile(models.Model):
     def username(self):
         """Non-editable username from user model"""
         return self.user.username
+
+
+class ChildhoodImage(models.Model):
+    """
+    Model to store multiple childhood images for a user profile
+    """
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='childhood_images')
+    image = models.ImageField(upload_to='childhood_images/')
+    caption = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Childhood image for {self.profile.user.fullname}"
+    
+    class Meta:
+        ordering = ['created_at']
 
 
 class PasswordResetToken(models.Model):

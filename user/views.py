@@ -13,11 +13,12 @@ from django.utils import timezone
 from datetime import timedelta
 import uuid
 
-from .models import User, Profile, PasswordResetToken
+from .models import User, Profile, PasswordResetToken, ChildhoodImage
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, UserSerializer,
     ProfileSerializer, ProfileImageSerializer, PasswordChangeSerializer,
-    ForgotPasswordSerializer, ResetPasswordSerializer
+    ForgotPasswordSerializer, ResetPasswordSerializer, ChildhoodImageSerializer,
+    ChildhoodImageUploadSerializer, BulkChildhoodImageUploadSerializer
 )
 from .email_utils import send_password_reset_email, send_welcome_email, send_password_change_confirmation
 
@@ -68,13 +69,16 @@ def logout_view(request):
     """
     User logout endpoint
     """
+    refresh_token = request.data.get("refresh")
+    if not refresh_token:
+        return Response({'error': 'Refresh token is required.'}, status=status.HTTP_400_BAD_REQUEST)
     try:
-        refresh_token = request.data["refresh"]
         token = RefreshToken(refresh_token)
         token.blacklist()
         return Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
     except Exception as e:
-        return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+        # Provide more details for debugging
+        return Response({'error': f'Invalid refresh token: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
@@ -170,7 +174,7 @@ def change_password_view(request):
 
 
 @api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.AllowAny])
 def refresh_token_view(request):
     """
     Refresh JWT token endpoint
@@ -178,8 +182,12 @@ def refresh_token_view(request):
     try:
         refresh_token = request.data["refresh"]
         token = RefreshToken(refresh_token)
+        # Rotate refresh token: create a new one
+        new_refresh = str(token)
+        new_access = str(token.access_token)
         return Response({
-            'access': str(token.access_token)
+            'access': new_access,
+            'refresh': new_refresh
         }, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({'error': 'Invalid refresh token'}, status=status.HTTP_400_BAD_REQUEST)
@@ -207,7 +215,7 @@ def get_profile_by_username(request, username):
     try:
         user = User.objects.get(username=username)
         profile, created = Profile.objects.get_or_create(user=user)
-        serializer = ProfileSerializer(profile)
+        serializer = ProfileSerializer(profile, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -244,3 +252,130 @@ def delete_profile_image(request):
             return Response({'error': 'No profile image to delete'}, status=status.HTTP_400_BAD_REQUEST)
     except Profile.DoesNotExist:
         return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# Childhood Image Views
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.IsAuthenticated])
+def childhood_images_view(request):
+    """
+    GET: Get all childhood images for the authenticated user
+    POST: Upload multiple childhood images
+    """
+    if request.method == 'GET':
+        try:
+            profile = Profile.objects.get(user=request.user)
+            childhood_images = profile.childhood_images.all()
+            serializer = ChildhoodImageSerializer(childhood_images, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Profile.DoesNotExist:
+            # Create profile if it doesn't exist
+            profile = Profile.objects.create(user=request.user)
+            return Response([], status=status.HTTP_200_OK)
+    
+    elif request.method == 'POST':
+        profile, created = Profile.objects.get_or_create(user=request.user)
+        serializer = BulkChildhoodImageUploadSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            images = serializer.validated_data['images']
+            captions = serializer.validated_data.get('captions', [])
+            
+            childhood_images = []
+            for i, image in enumerate(images):
+                caption = captions[i] if i < len(captions) else ''
+                childhood_image = ChildhoodImage.objects.create(
+                    profile=profile,
+                    image=image,
+                    caption=caption
+                )
+                childhood_images.append(childhood_image)
+            
+            response_serializer = ChildhoodImageSerializer(childhood_images, many=True)
+            return Response({
+                'message': f'{len(childhood_images)} childhood images uploaded successfully',
+                'images': response_serializer.data
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    serializer = ChildhoodImageSerializer(childhood_images, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['PUT'])
+@permission_classes([permissions.IsAuthenticated])
+def update_childhood_image(request, image_id):
+    """
+    Update a specific childhood image (caption only)
+    """
+    try:
+        profile = Profile.objects.get(user=request.user)
+        childhood_image = ChildhoodImage.objects.get(id=image_id, profile=profile)
+        
+        serializer = ChildhoodImageUploadSerializer(childhood_image, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    except (Profile.DoesNotExist, ChildhoodImage.DoesNotExist):
+        return Response({'error': 'Childhood image not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def delete_childhood_image(request, image_id):
+    """
+    Delete a specific childhood image
+    """
+    try:
+        profile = Profile.objects.get(user=request.user)
+        childhood_image = ChildhoodImage.objects.get(id=image_id, profile=profile)
+        childhood_image.image.delete()  # Delete the actual image file
+        childhood_image.delete()
+        return Response({'message': 'Childhood image deleted successfully'}, status=status.HTTP_200_OK)
+    
+    except (Profile.DoesNotExist, ChildhoodImage.DoesNotExist):
+        return Response({'error': 'Childhood image not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def delete_all_childhood_images(request):
+    """
+    Delete all childhood images for the authenticated user
+    """
+    try:
+        profile = Profile.objects.get(user=request.user)
+        childhood_images = profile.childhood_images.all()
+        
+        # Delete all image files
+        for img in childhood_images:
+            img.image.delete()
+        
+        # Delete all database records
+        count = childhood_images.count()
+        childhood_images.delete()
+        
+        return Response({'message': f'{count} childhood images deleted successfully'}, status=status.HTTP_200_OK)
+    
+    except Profile.DoesNotExist:
+        return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# Get user details by username
+from .serializers import UserSerializer
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def get_user_by_username(request, username):
+    """
+    Get user details by username (public endpoint)
+    """
+    from .models import User
+    try:
+        user = User.objects.get(username=username)
+        serializer = UserSerializer(user, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)

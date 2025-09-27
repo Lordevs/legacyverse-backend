@@ -6,29 +6,84 @@ User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for user information in blog contexts"""
+    """Serializer for user information in blog contexts, with profile image"""
+    profile_image = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'fullname', 'email', 'username']
+        fields = ['id', 'fullname', 'email', 'username', 'profile_image']
         read_only_fields = ['id', 'username']
+
+    def get_profile_image(self, obj):
+        # Assumes User has a related Profile with an image field
+        profile = getattr(obj, 'profile', None)
+        if profile and profile.image:
+            request = self.context.get('request')
+            image_url = profile.image.url
+            if request is not None:
+                return request.build_absolute_uri(image_url)
+            return image_url
+        return None
+
+
+# Blog detail serializer for slug endpoint (no comments, with views_count)
+class BlogDetailSerializer(serializers.ModelSerializer):
+    author = UserSerializer(read_only=True)
+    comments_count = serializers.IntegerField(read_only=True)
+    likes_count = serializers.IntegerField(read_only=True)
+    views_count = serializers.IntegerField(read_only=True)
+    is_liked_by_user = serializers.SerializerMethodField()
+    is_saved_by_user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Blog
+        fields = [
+            'id', 'title', 'content', 'author', 'status', 'content_source',
+            'ai_prompt', 'created_at', 'updated_at', 'published_at', 'slug',
+            'excerpt', 'tags', 'comments_count', 'likes_count', 'views_count',
+            'is_liked_by_user', 'is_saved_by_user'
+        ]
+        read_only_fields = [
+            'id', 'author', 'created_at', 'updated_at', 'published_at',
+            'slug', 'comments_count', 'likes_count', 'views_count'
+        ]
+
+    def get_is_liked_by_user(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            like = obj.likes.filter(user=request.user, is_liked=True).first()
+            return like is not None
+        return False
+
+    def get_is_saved_by_user(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.saved_by_users.filter(user=request.user).exists()
+        return False
 
 
 class CommentSerializer(serializers.ModelSerializer):
     """Serializer for blog comments"""
     author = UserSerializer(read_only=True)
     replies_count = serializers.SerializerMethodField()
-    
+    replies = serializers.SerializerMethodField()
+
     class Meta:
         model = Comment
         fields = [
-            'id', 'content', 'author', 'parent_comment', 
-            'created_at', 'updated_at', 'is_approved', 
-            'is_edited', 'replies_count'
+            'id', 'content', 'author', 'parent_comment',
+            'created_at', 'updated_at', 'is_approved',
+            'is_edited', 'replies_count', 'replies'
         ]
         read_only_fields = ['id', 'author', 'created_at', 'updated_at']
-    
+
     def get_replies_count(self, obj):
         return obj.replies.count()
+
+    def get_replies(self, obj):
+        # Only direct replies, not recursive
+        replies_qs = obj.replies.all().select_related('author')
+        return CommentSerializer(replies_qs, many=True, context=self.context).data
 
 
 class CommentCreateSerializer(serializers.ModelSerializer):
@@ -61,6 +116,7 @@ class BlogSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
     comments_count = serializers.IntegerField(read_only=True)
     likes_count = serializers.IntegerField(read_only=True)
+    views_count = serializers.IntegerField(read_only=True)
     is_liked_by_user = serializers.SerializerMethodField()
     is_saved_by_user = serializers.SerializerMethodField()
     comments = CommentSerializer(many=True, read_only=True)
@@ -70,12 +126,12 @@ class BlogSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'content', 'author', 'status', 'content_source',
             'ai_prompt', 'created_at', 'updated_at', 'published_at', 'slug',
-            'excerpt', 'tags', 'comments_count', 'likes_count', 
+            'excerpt', 'tags', 'comments_count', 'likes_count', 'views_count',
             'is_liked_by_user', 'is_saved_by_user', 'comments'
         ]
         read_only_fields = [
             'id', 'author', 'created_at', 'updated_at', 'published_at', 
-            'slug', 'comments_count', 'likes_count'
+            'slug', 'comments_count', 'likes_count', 'views_count'
         ]
     
     def get_is_liked_by_user(self, obj):
@@ -170,19 +226,37 @@ class BlogViewSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
+
 class BlogListSerializer(serializers.ModelSerializer):
-    """Simplified serializer for blog lists"""
+    """Simplified serializer for blog lists, with user like/save status"""
     author = UserSerializer(read_only=True)
     comments_count = serializers.IntegerField(read_only=True)
     likes_count = serializers.IntegerField(read_only=True)
-    
+    views_count = serializers.IntegerField(read_only=True)
+    is_liked_by_user = serializers.SerializerMethodField()
+    is_saved_by_user = serializers.SerializerMethodField()
+
     class Meta:
         model = Blog
         fields = [
             'id', 'title', 'excerpt', 'author', 'status', 'content_source',
             'created_at', 'updated_at', 'published_at', 'slug', 'tags',
-            'comments_count', 'likes_count'
+            'comments_count', 'likes_count', 'views_count',
+            'is_liked_by_user', 'is_saved_by_user'
         ]
+
+    def get_is_liked_by_user(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            like = obj.likes.filter(user=request.user, is_liked=True).first()
+            return like is not None
+        return False
+
+    def get_is_saved_by_user(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.saved_by_users.filter(user=request.user).exists()
+        return False
 
 
 class AIBlogGenerationSerializer(serializers.Serializer):
@@ -284,3 +358,11 @@ class AIContentRewriteSerializer(serializers.Serializer):
         if len(value.strip()) < 20:
             raise serializers.ValidationError("Content must be at least 20 characters long")
         return value.strip()
+    
+
+# Blog stats serializer
+class BlogStatsSerializer(serializers.Serializer):
+    total_blogs = serializers.IntegerField()
+    status_counts = serializers.DictField(child=serializers.IntegerField())
+    views_per_blog = serializers.DictField(child=serializers.IntegerField())
+    total_views = serializers.IntegerField()

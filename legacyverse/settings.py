@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'user',
     'blog',
 ]
@@ -196,8 +197,8 @@ SIMPLE_JWT = {
 }
 
 # Email Configuration (for password reset)
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # For production
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # For production
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
@@ -210,3 +211,8 @@ FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 
 # OpenAI Configuration
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
+
+# Google OAuth Configuration
+GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID', default='')
+GOOGLE_OAUTH_CLIENT_SECRET = config('GOOGLE_OAUTH_CLIENT_SECRET', default='')
+GOOGLE_OAUTH_REDIRECT_URI = config('GOOGLE_OAUTH_REDIRECT_URI', default='http://localhost:3000/auth/callback')

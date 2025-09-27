@@ -43,10 +43,11 @@ class BlogViewSet(ModelViewSet):
         queryset = Blog.objects.select_related('author').prefetch_related(
             'likes', 'comments', 'saved_by_users'
         ).annotate(
-            likes_count=Count('likes', filter=Q(likes__is_liked=True)),
-            comments_count=Count('comments')
+            likes_count=Count('likes', filter=Q(likes__is_liked=True), distinct=True),
+            comments_count=Count('comments', distinct=True),
+            views_count=Count('views', distinct=True)
         )
-        
+
         # Filter by status for public access
         if not self.request.user.is_authenticated:
             queryset = queryset.filter(status='public')
@@ -55,34 +56,36 @@ class BlogViewSet(ModelViewSet):
             queryset = queryset.filter(
                 Q(status='public') | Q(author=self.request.user)
             )
-        
+
         # Filter by author if specified
         author_id = self.request.query_params.get('author')
         if author_id:
             queryset = queryset.filter(author_id=author_id)
-        
+
         # Filter by status
         status_filter = self.request.query_params.get('status')
         if status_filter:
             queryset = queryset.filter(status=status_filter)
-        
+
         # Filter by tags
         tags = self.request.query_params.get('tags')
         if tags:
             tag_list = [tag.strip() for tag in tags.split(',')]
             for tag in tag_list:
                 queryset = queryset.filter(tags__icontains=tag)
-        
+
         # Search functionality
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(
-                Q(title__icontains=search) | 
-                Q(content__icontains=search) | 
+                Q(title__icontains=search) |
+                Q(content__icontains=search) |
                 Q(excerpt__icontains=search) |
-                Q(tags__icontains=search)
+                Q(tags__icontains=search) |
+                Q(author__fullname__icontains=search) |
+                Q(author__username__icontains=search)
             )
-        
+
         return queryset.order_by('-created_at')
     
     def perform_create(self, serializer):
@@ -172,10 +175,18 @@ class CommentViewSet(ModelViewSet):
     def get_queryset(self):
         blog_id = self.kwargs.get('blog_pk')
         if blog_id:
-            return Comment.objects.filter(
-                blog_id=blog_id,
-                parent_comment__isnull=True  # Only top-level comments
-            ).select_related('author').prefetch_related('replies__author').order_by('-created_at')
+            # If 'pk' is present, retrieve the specific comment (parent or child)
+            comment_pk = self.kwargs.get('pk')
+            if comment_pk:
+                return Comment.objects.filter(blog_id=blog_id, pk=comment_pk).select_related('author').prefetch_related('replies__author')
+            # Otherwise, list all comments for the blog (top-level only for list action)
+            if self.action == 'list':
+                return Comment.objects.filter(
+                    blog_id=blog_id,
+                    parent_comment__isnull=True
+                ).select_related('author').prefetch_related('replies__author').order_by('-created_at')
+            # For retrieve/update/destroy, allow any comment (parent or child)
+            return Comment.objects.filter(blog_id=blog_id).select_related('author').prefetch_related('replies__author')
         return Comment.objects.none()
     
     def get_serializer_context(self):
@@ -531,6 +542,7 @@ def user_saved_blogs(request):
     return Response(serializer.data)
 
 
+
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def user_blogs(request):
@@ -541,8 +553,37 @@ def user_blogs(request):
         likes_count=Count('likes', filter=Q(likes__is_liked=True)),
         comments_count=Count('comments')
     ).order_by('-created_at')
-    
     serializer = BlogSerializer(blogs, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+# Blog stats endpoint
+from .serializers import BlogStatsSerializer
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def user_blog_stats(request):
+    """
+    Get blog stats for the authenticated user
+    """
+    blogs = Blog.objects.filter(author=request.user)
+    total_blogs = blogs.count()
+    # Status-wise count
+    status_counts = blogs.values('status').annotate(count=Count('id'))
+    status_dict = {item['status']: item['count'] for item in status_counts}
+    # Views per blog
+    views_per_blog = {}
+    for blog in blogs:
+        views_per_blog[str(blog.id)] = blog.views.count()
+    # Total views
+    total_views = sum(views_per_blog.values())
+    data = {
+        'total_blogs': total_blogs,
+        'status_counts': status_dict,
+        'views_per_blog': views_per_blog,
+        'total_views': total_views
+    }
+    serializer = BlogStatsSerializer(data)
     return Response(serializer.data)
 
 
@@ -559,30 +600,31 @@ def blog_detail_by_slug(request, slug):
             likes_count=Count('likes', filter=Q(likes__is_liked=True)),
             comments_count=Count('comments')
         ).get(slug=slug)
-        
-        # Check if user can view this blog
-        if blog.status != 'public' and (
-            not request.user.is_authenticated or 
-            blog.author != request.user
-        ):
-            raise Http404("Blog not found")
-        
-        # Track view
-        if request.user.is_authenticated:
-            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-            if x_forwarded_for:
-                ip_address = x_forwarded_for.split(',')[0]
-            else:
-                ip_address = request.META.get('REMOTE_ADDR')
-            
-            BlogView.objects.get_or_create(
-                blog=blog,
-                user=request.user,
-                defaults={'ip_address': ip_address}
-            )
-        
-        serializer = BlogSerializer(blog, context={'request': request})
-        return Response(serializer.data)
-        
     except Blog.DoesNotExist:
         raise Http404("Blog not found")
+
+    # Check if user can view this blog
+    if blog.status != 'public' and (
+        not request.user.is_authenticated or 
+        blog.author != request.user
+    ):
+        raise Http404("Blog not found")
+
+    # Track view
+    if request.user.is_authenticated:
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip_address = x_forwarded_for.split(',')[0]
+        else:
+            ip_address = request.META.get('REMOTE_ADDR')
+        BlogView.objects.get_or_create(
+            blog=blog,
+            user=request.user,
+            defaults={'ip_address': ip_address}
+        )
+
+    from .serializers import BlogDetailSerializer
+    # Use BlogDetailSerializer to exclude comments and include views_count
+    blog.views_count = blog.views.count()
+    serializer = BlogDetailSerializer(blog, context={'request': request})
+    return Response(serializer.data)
