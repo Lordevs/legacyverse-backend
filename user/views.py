@@ -422,7 +422,7 @@ def profile_section_detail(request, section_id):
         return Response({'message': 'Section deleted successfully'}, status=status.HTTP_200_OK)
 
 
-@api_view(['POST'])
+@api_view(['POST', 'PUT'])
 @permission_classes([permissions.IsAuthenticated])
 def reorder_sections(request):
     """
