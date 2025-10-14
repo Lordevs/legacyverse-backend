@@ -95,23 +95,17 @@ class User(AbstractUser):
 
 class Profile(models.Model):
     """
-    User Profile model with additional information
+    User Profile model with dynamic sections
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     image = models.ImageField(upload_to='profile_images/', null=True, blank=True)
     bio = models.TextField(max_length=10000, blank=True)
     location = models.CharField(max_length=100, blank=True)
-    website = models.CharField(max_length=255, blank=True)
-    education_json = models.JSONField(default=dict, blank=True, help_text="Education information in JSON format")
-    hobbies = models.TextField(max_length=500, blank=True)
-    early_childhood = models.TextField(max_length=100000, blank=True)
-    
-    # New fields as requested
+    website = models.URLField(blank=True)
     joined_date = models.DateField(null=True, blank=True, help_text="User-provided joined date")
-    family_json = models.JSONField(default=dict, blank=True, help_text="Family information in JSON format")
-    community_json = models.JSONField(default=dict, blank=True, help_text="Community information in JSON format")
-    professional_experience_json = models.JSONField(default=dict, blank=True, help_text="Professional experience in JSON format")
-    accomplishment_json = models.JSONField(default=dict, blank=True, help_text="Accomplishments in JSON format")
+    
+    # Dynamic sections as JSON array - super simple!
+    sections = models.JSONField(default=list, blank=True, help_text="Array of profile sections")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -123,22 +117,124 @@ class Profile(models.Model):
     def username(self):
         """Non-editable username from user model"""
         return self.user.username
+    
+    def add_section(self, title, content):
+        """Helper method to add a new section"""
+        if not self.sections:
+            self.sections = []
+        
+        new_section = {
+            'id': str(uuid.uuid4()),
+            'title': title,
+            'content': content,
+            'images': [],
+            'created_at': timezone.now().isoformat(),
+            'updated_at': timezone.now().isoformat()
+        }
+        self.sections.append(new_section)
+        self.save()
+        return new_section
+    
+    def get_section_by_id(self, section_id):
+        """Get a specific section by ID"""
+        for section in self.sections:
+            if section.get('id') == section_id:
+                return section
+        return None
+    
+    def update_section(self, section_id, **kwargs):
+        """Update a specific section"""
+        for i, section in enumerate(self.sections):
+            if section.get('id') == section_id:
+                self.sections[i].update(kwargs)
+                self.sections[i]['updated_at'] = timezone.now().isoformat()
+                self.save()
+                return self.sections[i]
+        return None
+    
+    def delete_section(self, section_id):
+        """Delete a section"""
+        self.sections = [s for s in self.sections if s.get('id') != section_id]
+        self.save()
+    
+    def reorder_sections(self, new_order):
+        """Reorder sections - new_order is array of section IDs in desired order"""
+        # Create a mapping of section_id to new index
+        order_map = {section_id: i for i, section_id in enumerate(new_order)}
+        
+        # Sort sections based on the new order
+        self.sections.sort(key=lambda x: order_map.get(x.get('id'), 999))
+        self.save()
+    
+    def create_default_sections(self):
+        """Create default sections for new users"""
+        default_sections = [
+            {
+                'title': 'Early Childhood',
+                'content': 'Share your early childhood memories, experiences, and stories that shaped who you are today.'
+            },
+            {
+                'title': 'Family',
+                'content': 'Tell us about your family - parents, siblings, relatives, and the special moments you\'ve shared together.'
+            },
+            {
+                'title': 'Education',
+                'content': 'Describe your educational journey - schools, teachers, subjects you loved, and how education shaped your life.'
+            },
+            {
+                'title': 'Society & Community',
+                'content': 'Share your involvement in community activities, volunteer work, social causes, and how you\'ve contributed to society.'
+            },
+            {
+                'title': 'Professional Experience',
+                'content': 'Document your career journey, achievements, challenges overcome, and lessons learned in your professional life.'
+            },
+            {
+                'title': 'Story Telling',
+                'content': 'Share your personal stories, anecdotes, life lessons, and experiences that others might find inspiring or valuable.'
+            }
+        ]
+        
+        self.sections = []
+        for i, section_data in enumerate(default_sections):
+            section = {
+                'id': str(uuid.uuid4()),
+                'title': section_data['title'],
+                'content': section_data['content'],
+                'images': [],
+                'created_at': timezone.now().isoformat(),
+                'updated_at': timezone.now().isoformat()
+            }
+            self.sections.append(section)
+        
+        self.save()
+        return self.sections
+    
+    def reset_to_default_sections(self):
+        """Reset sections to default for existing users"""
+        return self.create_default_sections()
 
 
-class ChildhoodImage(models.Model):
+class SectionImage(models.Model):
     """
-    Model to store multiple childhood images for a user profile
+    Images for profile sections - stored separately for better management
     """
-    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='childhood_images')
-    image = models.ImageField(upload_to='childhood_images/')
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='section_images')
+    section_id = models.CharField(max_length=100, help_text="ID of the section this image belongs to")
+    image = models.ImageField(upload_to='section_images/')
     caption = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
-    def __str__(self):
-        return f"Childhood image for {self.profile.user.fullname}"
-    
     class Meta:
         ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['profile', 'section_id']),
+        ]
+    
+    def __str__(self):
+        return f"Image for section {self.section_id}"
+
+
 
 
 class PasswordResetToken(models.Model):

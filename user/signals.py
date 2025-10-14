@@ -6,10 +6,12 @@ from .models import User, Profile
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     """
-    Automatically create a profile when a user is created
+    Automatically create a profile with default sections when a user is created
     """
     if created:
-        Profile.objects.create(user=instance)
+        profile = Profile.objects.create(user=instance)
+        # Create default sections for new users
+        profile.create_default_sections()
 
 
 @receiver(post_save, sender=User)

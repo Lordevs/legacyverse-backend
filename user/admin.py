@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, Profile, PasswordResetToken, ChildhoodImage
+from .models import User, Profile, PasswordResetToken
 
 
 @admin.register(User)
@@ -27,13 +27,6 @@ class CustomUserAdmin(UserAdmin):
     readonly_fields = ('username', 'created_at', 'updated_at')
 
 
-class ChildhoodImageInline(admin.TabularInline):
-    """
-    Inline admin for childhood images
-    """
-    model = ChildhoodImage
-    extra = 0
-    readonly_fields = ('created_at',)
 
 
 @admin.register(Profile)
@@ -42,7 +35,6 @@ class ProfileAdmin(admin.ModelAdmin):
     list_filter = ('created_at', 'updated_at', 'joined_date')
     search_fields = ('user__email', 'user__fullname', 'location')
     readonly_fields = ('created_at', 'updated_at')
-    inlines = [ChildhoodImageInline]
     
     fieldsets = (
         ('Basic Information', {
@@ -62,12 +54,6 @@ class ProfileAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(ChildhoodImage)
-class ChildhoodImageAdmin(admin.ModelAdmin):
-    list_display = ('profile', 'caption', 'created_at')
-    list_filter = ('created_at',)
-    search_fields = ('profile__user__email', 'profile__user__fullname', 'caption')
-    readonly_fields = ('created_at',)
 
 
 @admin.register(PasswordResetToken)
