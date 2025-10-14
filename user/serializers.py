@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from .models import User, Profile, PasswordResetToken, ChildhoodImage
+from .models import User, Profile, PasswordResetToken, SectionImage
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -74,102 +74,74 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 
-class ChildhoodImageSerializer(serializers.ModelSerializer):
-    """
-    Serializer for childhood images with absolute image URL
-    """
+class SectionImageSerializer(serializers.ModelSerializer):
+    """Serializer for section images"""
     image = serializers.SerializerMethodField()
-
+    
     class Meta:
-        model = ChildhoodImage
+        model = SectionImage
         fields = ('id', 'image', 'caption', 'created_at')
         read_only_fields = ('id', 'created_at')
-
+    
     def get_image(self, obj):
         if obj.image:
             request = self.context.get('request')
-            image_url = obj.image.url
-            if request is not None:
-                return request.build_absolute_uri(image_url)
-            return image_url
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
         return None
 
 
+
+
 class ProfileSerializer(serializers.ModelSerializer):
-    """
-    Serializer for user profile
-    """
+    """Updated profile serializer with dynamic sections"""
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
     fullname = serializers.CharField(source='user.fullname', read_only=True)
     id = serializers.UUIDField(source='user.id', read_only=True)
-    def get_childhood_images(self, obj):
-        # Pass context to ensure absolute URLs
-        serializer = ChildhoodImageSerializer(obj.childhood_images.all(), many=True, context=self.context)
-        return serializer.data
-
-    childhood_images = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
+    sections = serializers.SerializerMethodField()
     
     class Meta:
         model = Profile
         fields = (
-            'id', 'username', 'email', 'fullname', 'image', 'bio', 'location', 
-            'website', 'education_json', 'hobbies', 'early_childhood',
-            'joined_date', 'childhood_images', 'family_json', 'community_json',
-            'professional_experience_json', 'accomplishment_json',
+            'id', 'username', 'email', 'fullname', 'image', 'bio', 
+            'location', 'website', 'joined_date', 'sections', 
             'created_at', 'updated_at'
         )
         read_only_fields = ('id', 'created_at', 'updated_at')
-
+    
     def get_image(self, obj):
         if obj.image:
             request = self.context.get('request')
-            image_url = obj.image.url
-            if request is not None:
-                return request.build_absolute_uri(image_url)
-            return image_url
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
         return None
-
-    def validate_education_json(self, value):
-        """Validate that education_json is a valid dict"""
-        if value is not None and not isinstance(value, dict):
-            raise serializers.ValidationError("Education JSON must be a valid dictionary")
-        return value
     
-    def validate_family_json(self, value):
-        """Validate that family_json is a valid dict"""
-        if value is not None and not isinstance(value, dict):
-            raise serializers.ValidationError("Family JSON must be a valid dictionary")
-        return value
-    
-    def validate_community_json(self, value):
-        """Validate that community_json is a valid dict"""
-        if value is not None and not isinstance(value, dict):
-            raise serializers.ValidationError("Community JSON must be a valid dictionary")
-        return value
-    
-    def validate_professional_experience_json(self, value):
-        """Validate that professional_experience_json is a valid dict"""
-        if value is not None and not isinstance(value, dict):
-            raise serializers.ValidationError("Professional experience JSON must be a valid dictionary")
-        return value
-    
-    def validate_accomplishment_json(self, value):
-        """Validate that accomplishment_json is a valid dict"""
-        if value is not None and not isinstance(value, dict):
-            raise serializers.ValidationError("Accomplishment JSON must be a valid dictionary")
-        return value
-    
-    def update(self, instance, validated_data):
-        # Update user fullname if provided
-        if 'user' in validated_data:
-            user_data = validated_data.pop('user')
-            if 'fullname' in user_data:
-                instance.user.fullname = user_data['fullname']
-                instance.user.save()
+    def get_sections(self, obj):
+        """Get sections with their images - array order is the natural order"""
+        if not obj.sections:
+            return []
         
-        return super().update(instance, validated_data)
+        # Add images to each section
+        for section in obj.sections:
+            section_id = section.get('id')
+            if section_id:
+                images = SectionImage.objects.filter(
+                    profile=obj,
+                    section_id=section_id
+                ).order_by('created_at')
+                
+                section['images'] = SectionImageSerializer(
+                    images, 
+                    many=True, 
+                    context=self.context
+                ).data
+        
+        return obj.sections  # Array order is the natural order!
+    
 
 
 class ProfileImageSerializer(serializers.ModelSerializer):
@@ -181,30 +153,6 @@ class ProfileImageSerializer(serializers.ModelSerializer):
         fields = ('image',)
 
 
-class ChildhoodImageUploadSerializer(serializers.ModelSerializer):
-    """
-    Serializer for uploading childhood images
-    """
-    class Meta:
-        model = ChildhoodImage
-        fields = ('image', 'caption')
-
-
-class BulkChildhoodImageUploadSerializer(serializers.Serializer):
-    """
-    Serializer for bulk uploading childhood images
-    """
-    images = serializers.ListField(
-        child=serializers.ImageField(), 
-        allow_empty=False,
-        max_length=10,  # Limit to 10 images at once
-        help_text="List of childhood images to upload"
-    )
-    captions = serializers.ListField(
-        child=serializers.CharField(max_length=200, required=False, allow_blank=True),
-        required=False,
-        help_text="Optional captions for the images"
-    )
     
     def to_internal_value(self, data):
         # Handle captions when sent as JSON string in form data

@@ -13,12 +13,11 @@ from django.utils import timezone
 from datetime import timedelta
 import uuid
 
-from .models import User, Profile, PasswordResetToken, ChildhoodImage
+from .models import User, Profile, PasswordResetToken, SectionImage
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, UserSerializer,
     ProfileSerializer, ProfileImageSerializer, PasswordChangeSerializer,
-    ForgotPasswordSerializer, ResetPasswordSerializer, ChildhoodImageSerializer,
-    ChildhoodImageUploadSerializer, BulkChildhoodImageUploadSerializer
+    ForgotPasswordSerializer, ResetPasswordSerializer, SectionImageSerializer
 )
 from .email_utils import send_password_reset_email, send_welcome_email, send_password_change_confirmation
 
@@ -254,113 +253,7 @@ def delete_profile_image(request):
         return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
-# Childhood Image Views
-@api_view(['GET', 'POST'])
-@permission_classes([permissions.IsAuthenticated])
-def childhood_images_view(request):
-    """
-    GET: Get all childhood images for the authenticated user
-    POST: Upload multiple childhood images
-    """
-    if request.method == 'GET':
-        try:
-            profile = Profile.objects.get(user=request.user)
-            childhood_images = profile.childhood_images.all()
-            serializer = ChildhoodImageSerializer(childhood_images, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        except Profile.DoesNotExist:
-            # Create profile if it doesn't exist
-            profile = Profile.objects.create(user=request.user)
-            return Response([], status=status.HTTP_200_OK)
-    
-    elif request.method == 'POST':
-        profile, created = Profile.objects.get_or_create(user=request.user)
-        serializer = BulkChildhoodImageUploadSerializer(data=request.data)
-        
-        if serializer.is_valid():
-            images = serializer.validated_data['images']
-            captions = serializer.validated_data.get('captions', [])
-            
-            childhood_images = []
-            for i, image in enumerate(images):
-                caption = captions[i] if i < len(captions) else ''
-                childhood_image = ChildhoodImage.objects.create(
-                    profile=profile,
-                    image=image,
-                    caption=caption
-                )
-                childhood_images.append(childhood_image)
-            
-            response_serializer = ChildhoodImageSerializer(childhood_images, many=True)
-            return Response({
-                'message': f'{len(childhood_images)} childhood images uploaded successfully',
-                'images': response_serializer.data
-            }, status=status.HTTP_201_CREATED)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    serializer = ChildhoodImageSerializer(childhood_images, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-@api_view(['PUT'])
-@permission_classes([permissions.IsAuthenticated])
-def update_childhood_image(request, image_id):
-    """
-    Update a specific childhood image (caption only)
-    """
-    try:
-        profile = Profile.objects.get(user=request.user)
-        childhood_image = ChildhoodImage.objects.get(id=image_id, profile=profile)
-        
-        serializer = ChildhoodImageUploadSerializer(childhood_image, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    except (Profile.DoesNotExist, ChildhoodImage.DoesNotExist):
-        return Response({'error': 'Childhood image not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
-@api_view(['DELETE'])
-@permission_classes([permissions.IsAuthenticated])
-def delete_childhood_image(request, image_id):
-    """
-    Delete a specific childhood image
-    """
-    try:
-        profile = Profile.objects.get(user=request.user)
-        childhood_image = ChildhoodImage.objects.get(id=image_id, profile=profile)
-        childhood_image.image.delete()  # Delete the actual image file
-        childhood_image.delete()
-        return Response({'message': 'Childhood image deleted successfully'}, status=status.HTTP_200_OK)
-    
-    except (Profile.DoesNotExist, ChildhoodImage.DoesNotExist):
-        return Response({'error': 'Childhood image not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
-@api_view(['DELETE'])
-@permission_classes([permissions.IsAuthenticated])
-def delete_all_childhood_images(request):
-    """
-    Delete all childhood images for the authenticated user
-    """
-    try:
-        profile = Profile.objects.get(user=request.user)
-        childhood_images = profile.childhood_images.all()
-        
-        # Delete all image files
-        for img in childhood_images:
-            img.image.delete()
-        
-        # Delete all database records
-        count = childhood_images.count()
-        childhood_images.delete()
-        
-        return Response({'message': f'{count} childhood images deleted successfully'}, status=status.HTTP_200_OK)
-    
-    except Profile.DoesNotExist:
-        return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+# Section Management Views
 
 
 # Get user details by username
@@ -379,3 +272,261 @@ def get_user_by_username(request, username):
         return Response(serializer.data, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# New unified profile update views
+@api_view(['PUT', 'PATCH'])
+@permission_classes([permissions.IsAuthenticated])
+def update_profile_complete(request):
+    """
+    Update complete profile - handles both JSON and file uploads
+    """
+    profile, created = Profile.objects.get_or_create(user=request.user)
+    
+    try:
+        # Handle form data
+        if request.content_type.startswith('multipart/form-data'):
+            # Extract sections data from form
+            sections_data = request.data.get('sections')
+            if sections_data:
+                if isinstance(sections_data, str):
+                    import json
+                    sections_data = json.loads(sections_data)
+                
+                # Update sections
+                profile.sections = sections_data
+                profile.save()
+                
+                # Handle images for each section
+                for section in sections_data:
+                    section_id = section.get('id')
+                    if section_id:
+                        # Get images for this section from form data
+                        section_images = request.FILES.getlist(f'section_{section_id}_images')
+                        section_captions = request.data.getlist(f'section_{section_id}_captions', [])
+                        
+                        # Delete existing images for this section
+                        SectionImage.objects.filter(
+                            profile=profile,
+                            section_id=section_id
+                        ).delete()
+                        
+                        # Upload new images
+                        for i, image in enumerate(section_images):
+                            caption = section_captions[i] if i < len(section_captions) else ''
+                            SectionImage.objects.create(
+                                profile=profile,
+                                section_id=section_id,
+                                image=image,
+                                caption=caption
+                            )
+            
+            # Update basic profile fields
+            if 'bio' in request.data:
+                profile.bio = request.data['bio']
+            if 'location' in request.data:
+                profile.location = request.data['location']
+            if 'website' in request.data:
+                profile.website = request.data['website']
+            if 'joined_date' in request.data:
+                profile.joined_date = request.data['joined_date']
+            if 'image' in request.FILES:
+                profile.image = request.FILES['image']
+            
+            profile.save()
+            
+        else:
+            # Handle JSON data
+            sections_data = request.data.get('sections', [])
+            if sections_data:
+                profile.sections = sections_data
+                profile.save()
+            
+            # Update other fields
+            if 'bio' in request.data:
+                profile.bio = request.data['bio']
+            if 'location' in request.data:
+                profile.location = request.data['location']
+            if 'website' in request.data:
+                profile.website = request.data['website']
+            if 'joined_date' in request.data:
+                profile.joined_date = request.data['joined_date']
+        
+        # Return updated profile
+        serializer = ProfileSerializer(profile, context={'request': request})
+        return Response(serializer.data)
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.IsAuthenticated])
+def profile_sections_view(request):
+    """
+    GET: Get all sections for authenticated user
+    POST: Create new section
+    """
+    profile, created = Profile.objects.get_or_create(user=request.user)
+    
+    if request.method == 'GET':
+        serializer = ProfileSerializer(profile, context={'request': request})
+        return Response({
+            'sections': serializer.data.get('sections', [])
+        })
+    
+    elif request.method == 'POST':
+        title = request.data.get('title')
+        content = request.data.get('content')
+        
+        if not title or not content:
+            return Response(
+                {'error': 'Title and content are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        new_section = profile.add_section(title, content)
+        return Response(new_section, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def profile_section_detail(request, section_id):
+    """
+    Manage individual profile sections
+    """
+    profile, created = Profile.objects.get_or_create(user=request.user)
+    section = profile.get_section_by_id(section_id)
+    
+    if not section:
+        return Response({'error': 'Section not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        return Response(section)
+    
+    elif request.method in ['PUT', 'PATCH']:
+        # Update section data
+        update_data = {}
+        if 'title' in request.data:
+            update_data['title'] = request.data['title']
+        if 'content' in request.data:
+            update_data['content'] = request.data['content']
+        
+        updated_section = profile.update_section(section_id, **update_data)
+        if updated_section:
+            return Response(updated_section)
+        return Response({'error': 'Failed to update section'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        profile.delete_section(section_id)
+        return Response({'message': 'Section deleted successfully'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def reorder_sections(request):
+    """
+    Reorder profile sections - just pass array of section IDs in desired order
+    """
+    profile, created = Profile.objects.get_or_create(user=request.user)
+    new_order = request.data.get('section_ids', [])
+    
+    if not new_order:
+        return Response({'error': 'section_ids array is required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        profile.reorder_sections(new_order)
+        return Response({'message': 'Sections reordered successfully'})
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def upload_section_images(request, section_id):
+    """
+    Upload multiple images for a section
+    """
+    profile, created = Profile.objects.get_or_create(user=request.user)
+    
+    # Check if section exists
+    section = profile.get_section_by_id(section_id)
+    if not section:
+        return Response({'error': 'Section not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    images = request.FILES.getlist('images')
+    captions = request.data.getlist('captions', [])
+    
+    if not images:
+        return Response({'error': 'No images provided'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Delete existing images for this section
+    SectionImage.objects.filter(
+        profile=profile,
+        section_id=section_id
+    ).delete()
+    
+    created_images = []
+    for i, image in enumerate(images):
+        caption = captions[i] if i < len(captions) else ''
+        section_image = SectionImage.objects.create(
+            profile=profile,
+            section_id=section_id,
+            image=image,
+            caption=caption
+        )
+        created_images.append(section_image)
+    
+    serializer = SectionImageSerializer(created_images, many=True, context={'request': request})
+    return Response({
+        'message': f'{len(created_images)} images uploaded successfully',
+        'images': serializer.data
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def section_image_detail(request, image_id):
+    """
+    Update or delete a section image
+    """
+    try:
+        image = SectionImage.objects.get(
+            id=image_id,
+            profile__user=request.user
+        )
+    except SectionImage.DoesNotExist:
+        return Response({'error': 'Image not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'PUT':
+        # Update image caption
+        caption = request.data.get('caption', '')
+        image.caption = caption
+        image.save()
+        
+        serializer = SectionImageSerializer(image, context={'request': request})
+        return Response(serializer.data)
+    
+    elif request.method == 'DELETE':
+        image.image.delete()  # Delete the actual file
+        image.delete()
+        return Response({'message': 'Image deleted successfully'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def reset_sections_to_default(request):
+    """
+    Reset user's sections to default sections
+    """
+    profile, created = Profile.objects.get_or_create(user=request.user)
+    
+    try:
+        default_sections = profile.reset_to_default_sections()
+        serializer = ProfileSerializer(profile, context={'request': request})
+        return Response({
+            'message': 'Sections reset to default successfully',
+            'sections': serializer.data.get('sections', [])
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

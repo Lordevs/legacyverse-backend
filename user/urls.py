@@ -21,11 +21,19 @@ urlpatterns = [
     path('profile/image/', views.update_profile_image, name='update_profile_image'),
     path('profile/image/delete/', views.delete_profile_image, name='delete_profile_image'),
     
-    # Childhood Images URLs (put before username pattern to avoid conflicts)
-    path('profile/childhood-images/', views.childhood_images_view, name='childhood_images'),
-    path('profile/childhood-images/<int:image_id>/', views.update_childhood_image, name='update_childhood_image'),
-    path('profile/childhood-images/<int:image_id>/delete/', views.delete_childhood_image, name='delete_childhood_image'),
-    path('profile/childhood-images/delete-all/', views.delete_all_childhood_images, name='delete_all_childhood_images'),
+    # Complete profile update (unified endpoint)
+    path('profile/update-complete/', views.update_profile_complete, name='update_profile_complete'),
+    
+    # Profile sections management
+    path('profile/sections/', views.profile_sections_view, name='profile_sections'),
+    path('profile/sections/reorder/', views.reorder_sections, name='reorder_sections'),
+    path('profile/sections/reset-default/', views.reset_sections_to_default, name='reset_sections_to_default'),
+    path('profile/sections/<str:section_id>/', views.profile_section_detail, name='profile_section_detail'),
+    
+    # Section images
+    path('profile/sections/<str:section_id>/images/', views.upload_section_images, name='upload_section_images'),
+    path('profile/sections/images/<uuid:image_id>/', views.section_image_detail, name='section_image_detail'),
+    
     
     # Username pattern should be last to avoid conflicts
     path('profile/<str:username>/', views.get_profile_by_username, name='profile_by_username'),

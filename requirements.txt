@@ -1,9 +1,9 @@
 Django==5.1.4
-psycopg2-binary==2.9.9
+psycopg2-binary
 django-cors-headers==4.3.1
 python-decouple==3.8
 djangorestframework==3.15.2
 djangorestframework-simplejwt
 Pillow==10.4.0
 django-allauth==0.62.1
-openai==0.28.1
+openai
