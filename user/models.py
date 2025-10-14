@@ -99,12 +99,12 @@ class Profile(models.Model):
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     image = models.ImageField(upload_to='profile_images/', null=True, blank=True)
-    bio = models.TextField(max_length=500, blank=True)
+    bio = models.TextField(max_length=10000, blank=True)
     location = models.CharField(max_length=100, blank=True)
-    website = models.URLField(blank=True)
+    website = models.CharField(max_length=255, blank=True)
     education_json = models.JSONField(default=dict, blank=True, help_text="Education information in JSON format")
     hobbies = models.TextField(max_length=500, blank=True)
-    early_childhood = models.TextField(max_length=1000, blank=True)
+    early_childhood = models.TextField(max_length=100000, blank=True)
     
     # New fields as requested
     joined_date = models.DateField(null=True, blank=True, help_text="User-provided joined date")

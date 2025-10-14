@@ -147,7 +147,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "http://api.memoriva.org",
-    "https://memoriva.org",
+   "https://memoriva.org/","https://www.memoriva.org/"
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -215,7 +215,7 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@legacyverse.com')
 
 # Frontend URL for email links
-FRONTEND_URL = config('FRONTEND_URL', default='http://api.memoriva.org')
+FRONTEND_URL = config('FRONTEND_URL', default='http://memoriva.org')
 
 # OpenAI Configuration
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='')

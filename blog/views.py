@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from django.shortcuts import get_object_or_404
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Case, When, IntegerField, Value
 from django.utils import timezone
 from django.http import Http404
 from django.conf import settings
@@ -102,6 +102,58 @@ class BlogViewSet(ModelViewSet):
         if instance.author != self.request.user:
             raise PermissionError("You can only delete your own blogs")
         instance.delete()
+    
+    @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny])
+    def search(self, request):
+        """Partial search across title and content with simple relevance ranking.
+        Ranking priority: exact title > partial title > partial content.
+        Optional query params:
+        - q: search string (required)
+        - limit: max results (default 20)
+        """
+        query = request.query_params.get('q', '').strip()
+        if not query:
+            return Response({'detail': 'Missing q parameter'}, status=status.HTTP_400_BAD_REQUEST)
+
+        limit = request.query_params.get('limit')
+        try:
+            limit = int(limit) if limit else 20
+        except ValueError:
+            limit = 20
+
+        base_qs = Blog.objects.select_related('author').annotate(
+            likes_count=Count('likes', filter=Q(likes__is_liked=True), distinct=True),
+            comments_count=Count('comments', distinct=True),
+            views_count=Count('views', distinct=True)
+        )
+
+        # Public-only for anonymous users; authors can see their drafts via list(),
+        # but search endpoint exposes only public for simplicity/security.
+        base_qs = base_qs.filter(status='public')
+
+        # Basic matching filters
+        filters = Q(title__icontains=query) | Q(content__icontains=query)
+
+        # Relevance scoring using Case/When
+        ranked_qs = base_qs.filter(filters).annotate(
+            relevance=Case(
+                When(title__iexact=query, then=Value(100)),
+                When(title__istartswith=query, then=Value(90)),
+                When(title__icontains=query, then=Value(80)),
+                When(content__icontains=query, then=Value(50)),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+        ).order_by('-relevance', '-created_at')
+
+        results = ranked_qs[:limit]
+
+        # Use list serializer for compact results
+        serializer = BlogListSerializer(results, many=True, context={'request': request})
+        return Response({
+            'count': ranked_qs.count(),
+            'results': serializer.data
+        })
     
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def like(self, request, pk=None):

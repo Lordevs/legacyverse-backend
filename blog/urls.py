@@ -39,4 +39,7 @@ urlpatterns = [
     
     # SEO-friendly blog URLs
     path('api/blog/<slug:slug>/', views.blog_detail_by_slug, name='blog-detail-slug'),
+
+    # Search endpoint
+    path('api/blogs/search/', views.BlogViewSet.as_view({'get': 'search'}), name='blog-search'),
 ]
