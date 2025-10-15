@@ -1,0 +1,1105 @@
+{
+	"info": {
+		"name": "LegacyVerse Integrated API",
+		"description": "Unified API collection for both user and admin functionality",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "User Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/auth/login/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "auth", "login", ""]
+						},
+						"description": "Login user and get JWT token with role information"
+					},
+					"response": []
+				},
+				{
+					"name": "User Registration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"newuser@example.com\",\n  \"fullname\": \"New User\",\n  \"password\": \"password123\",\n  \"confirm_password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/auth/register/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "auth", "register", ""]
+						},
+						"description": "Register new user"
+					},
+					"response": []
+				},
+				{
+					"name": "User Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/auth/logout/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "auth", "logout", ""]
+						},
+						"description": "Logout user and blacklist token"
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/auth/refresh/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "auth", "refresh", ""]
+						},
+						"description": "Refresh JWT token"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "User Profile Management",
+			"item": [
+				{
+					"name": "Get Own Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", ""]
+						},
+						"description": "Get current user's profile"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Profile (JSON)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"bio\": \"Updated bio text\",\n  \"location\": \"New City, Country\",\n  \"website\": \"https://newwebsite.com\",\n  \"joined_date\": \"2024-01-01\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/update-complete/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "update-complete", ""]
+						},
+						"description": "Update profile with JSON data"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Profile (Form Data)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "bio",
+									"value": "Updated bio text",
+									"type": "text"
+								},
+								{
+									"key": "location",
+									"value": "New City, Country",
+									"type": "text"
+								},
+								{
+									"key": "website",
+									"value": "https://newwebsite.com",
+									"type": "text"
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/update-complete/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "update-complete", ""]
+						},
+						"description": "Update profile with file uploads"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Profile Image",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/image/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "image", ""]
+						},
+						"description": "Upload profile image"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Profile Image",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/image/delete/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "image", "delete", ""]
+						},
+						"description": "Delete profile image"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Profile by Username",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/{{username}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "{{username}}", ""]
+						},
+						"description": "Get public profile by username"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Profile Sections Management",
+			"item": [
+				{
+					"name": "Get Profile Sections",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/sections/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "sections", ""]
+						},
+						"description": "Get all profile sections"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Profile Section",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"New Section Title\",\n  \"content\": \"Section content here...\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/sections/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "sections", ""]
+						},
+						"description": "Create new profile section"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Section Detail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/sections/{{section_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "sections", "{{section_id}}", ""]
+						},
+						"description": "Get specific section details"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Section",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated Section Title\",\n  \"content\": \"Updated section content...\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/sections/{{section_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "sections", "{{section_id}}", ""]
+						},
+						"description": "Update specific section"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Section",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/sections/{{section_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "sections", "{{section_id}}", ""]
+						},
+						"description": "Delete specific section"
+					},
+					"response": []
+				},
+				{
+					"name": "Reorder Sections",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"section_ids\": [\"section-uuid-1\", \"section-uuid-2\", \"section-uuid-3\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/sections/reorder/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "sections", "reorder", ""]
+						},
+						"description": "Reorder profile sections"
+					},
+					"response": []
+				},
+				{
+					"name": "Reset Sections to Default",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/sections/reset-default/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "sections", "reset-default", ""]
+						},
+						"description": "Reset sections to default"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Section Images Management",
+			"item": [
+				{
+					"name": "Upload Section Images",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "images",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "images",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "captions",
+									"value": "Caption 1",
+									"type": "text"
+								},
+								{
+									"key": "captions",
+									"value": "Caption 2",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/sections/{{section_id}}/images/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "sections", "{{section_id}}", "images", ""]
+						},
+						"description": "Upload multiple images for a section"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Section Image",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"caption\": \"Updated image caption\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/sections/images/{{image_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "sections", "images", "{{image_id}}", ""]
+						},
+						"description": "Update section image caption"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Section Image",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/profile/sections/images/{{image_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "profile", "sections", "images", "{{image_id}}", ""]
+						},
+						"description": "Delete section image"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin User Management",
+			"item": [
+				{
+					"name": "List All Users",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/?search=&is_active=&is_staff=",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", ""],
+							"query": [
+								{
+									"key": "search",
+									"value": "",
+									"description": "Search by email, fullname, or username"
+								},
+								{
+									"key": "is_active",
+									"value": "",
+									"description": "Filter by active status (true/false)"
+								},
+								{
+									"key": "is_staff",
+									"value": "",
+									"description": "Filter by staff status (true/false)"
+								}
+							]
+						},
+						"description": "List all users (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Create New User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"newuser@example.com\",\n  \"fullname\": \"New User\",\n  \"password\": \"password123\",\n  \"is_verified\": false,\n  \"is_active\": true,\n  \"is_staff\": false,\n  \"bio\": \"This is a new user created by admin\",\n  \"location\": \"New York, USA\",\n  \"website\": \"https://newuser.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/create/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "create", ""]
+						},
+						"description": "Create new user with profile data (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Detail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", ""]
+						},
+						"description": "Get specific user details (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update User",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"updated@example.com\",\n  \"fullname\": \"Updated Name\",\n  \"is_verified\": true,\n  \"is_active\": true,\n  \"is_staff\": false,\n  \"bio\": \"Updated bio by admin\",\n  \"location\": \"Updated City, Country\",\n  \"website\": \"https://updatedwebsite.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", ""]
+						},
+						"description": "Update user information including profile fields (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete User",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", ""]
+						},
+						"description": "Delete user (admin only)"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin Profile Management",
+			"item": [
+				{
+					"name": "Get User Profile (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", ""]
+						},
+						"description": "Get any user's profile (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Profile (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"updated@example.com\",\n  \"fullname\": \"Updated Full Name\",\n  \"bio\": \"Updated bio by admin\",\n  \"location\": \"New City, Country\",\n  \"website\": \"https://newwebsite.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/update/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", "update", ""]
+						},
+						"description": "Update any user's profile including email and fullname (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload User Profile Image (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/image/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", "image", ""]
+						},
+						"description": "Upload profile image for any user (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete User Profile Image (Admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/image/delete/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", "image", "delete", ""]
+						},
+						"description": "Delete profile image for any user (admin only)"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin Section Management",
+			"item": [
+				{
+					"name": "Get User Profile Sections (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/sections/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", "sections", ""]
+						},
+						"description": "Get any user's profile sections (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Create User Profile Section (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"New Section by Admin\",\n  \"content\": \"Section content created by admin...\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/sections/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", "sections", ""]
+						},
+						"description": "Create section for any user (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Profile Section (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated Section by Admin\",\n  \"content\": \"Updated section content by admin...\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/sections/{{section_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", "sections", "{{section_id}}", ""]
+						},
+						"description": "Update any user's section (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete User Profile Section (Admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/sections/{{section_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", "sections", "{{section_id}}", ""]
+						},
+						"description": "Delete any user's section (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Reorder User Sections (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"section_ids\": [\"section-uuid-1\", \"section-uuid-2\", \"section-uuid-3\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/sections/reorder/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", "sections", "reorder", ""]
+						},
+						"description": "Reorder any user's sections (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Reset User Sections to Default (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/sections/reset-default/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", "sections", "reset-default", ""]
+						},
+						"description": "Reset any user's sections to default (admin only)"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin Image Management",
+			"item": [
+				{
+					"name": "Upload User Section Images (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "images",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "images",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "captions",
+									"value": "Caption 1",
+									"type": "text"
+								},
+								{
+									"key": "captions",
+									"value": "Caption 2",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/sections/{{section_id}}/images/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", "sections", "{{section_id}}", "images", ""]
+						},
+						"description": "Upload images for any user's section (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Section Image (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"caption\": \"Updated caption by admin\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/sections/{{section_id}}/images/{{image_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", "sections", "{{section_id}}", "images", "{{image_id}}", ""]
+						},
+						"description": "Update any user's section image (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete User Section Image (Admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/admin/users/{{user_id}}/profile/sections/{{section_id}}/images/{{image_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "admin", "users", "{{user_id}}", "profile", "sections", "{{section_id}}", "images", "{{image_id}}", ""]
+						},
+						"description": "Delete any user's section image (admin only)"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string",
+			"description": "API base URL"
+		},
+		{
+			"key": "access_token",
+			"value": "",
+			"type": "string",
+			"description": "JWT access token (set after login)"
+		},
+		{
+			"key": "refresh_token",
+			"value": "",
+			"type": "string",
+			"description": "JWT refresh token (set after login)"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string",
+			"description": "User ID for admin operations"
+		},
+		{
+			"key": "section_id",
+			"value": "",
+			"type": "string",
+			"description": "Section ID for operations"
+		},
+		{
+			"key": "image_id",
+			"value": "",
+			"type": "string",
+			"description": "Image ID for operations"
+		},
+		{
+			"key": "username",
+			"value": "",
+			"type": "string",
+			"description": "Username for profile lookup"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-set Authorization header if token exists",
+					"if (pm.environment.get('access_token')) {",
+					"    // Remove existing Authorization header first",
+					"    pm.request.headers.remove('Authorization');",
+					"    // Add new Authorization header with proper format",
+					"    pm.request.headers.add({",
+					"        key: 'Authorization',",
+					"        value: 'Bearer ' + pm.environment.get('access_token')",
+					"    });",
+					"}"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-extract tokens from login response",
+					"if (pm.response.code === 200 && pm.request.url.path.includes('login')) {",
+					"    const responseJson = pm.response.json();",
+					"    if (responseJson.access) {",
+					"        pm.environment.set('access_token', responseJson.access);",
+					"    }",
+					"    if (responseJson.refresh) {",
+					"        pm.environment.set('refresh_token', responseJson.refresh);",
+					"    }",
+					"    if (responseJson.user) {",
+					"        pm.environment.set('user_id', responseJson.user.id);",
+					"        pm.environment.set('is_admin', responseJson.user.is_admin);",
+					"    }",
+					"}",
+					"",
+					"// Auto-extract IDs from responses",
+					"if (pm.response.code === 200 || pm.response.code === 201) {",
+					"    const responseJson = pm.response.json();",
+					"    ",
+					"    // Extract user_id from user list or user detail",
+					"    if (responseJson.id && responseJson.email) {",
+					"        pm.environment.set('user_id', responseJson.id);",
+					"    }",
+					"    ",
+					"    // Extract section_id from section creation",
+					"    if (responseJson.id && responseJson.title) {",
+					"        pm.environment.set('section_id', responseJson.id);",
+					"    }",
+					"    ",
+					"    // Extract image_id from image upload",
+					"    if (responseJson.id && responseJson.image) {",
+					"        pm.environment.set('image_id', responseJson.id);",
+					"    }",
+					"}"
+				]
+			}
+		}
+	]
+}

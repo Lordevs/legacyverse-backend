@@ -67,10 +67,31 @@ class UserSerializer(serializers.ModelSerializer):
     """
     Serializer for user data
     """
+    is_admin = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+    
     class Meta:
         model = User
-        fields = ('id', 'email', 'fullname', 'username', 'is_verified', 'created_at')
+        fields = ('id', 'email', 'fullname', 'username', 'is_verified', 'is_admin', 'image', 'created_at')
         read_only_fields = ('id', 'username', 'is_verified', 'created_at')
+    
+    def get_is_admin(self, obj):
+        """Get admin status for the user"""
+        return obj.is_staff or obj.is_superuser
+    
+    def get_image(self, obj):
+        """Get user's profile image URL"""
+        try:
+            profile = obj.profile
+            if profile and profile.image:
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(profile.image.url)
+                return profile.image.url
+        except:
+            # If profile doesn't exist, return None
+            pass
+        return None
 
 
 
@@ -100,17 +121,22 @@ class ProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
     fullname = serializers.CharField(source='user.fullname', read_only=True)
     id = serializers.UUIDField(source='user.id', read_only=True)
+    is_admin = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
     sections = serializers.SerializerMethodField()
     
     class Meta:
         model = Profile
         fields = (
-            'id', 'username', 'email', 'fullname', 'image', 'bio', 
+            'id', 'username', 'email', 'fullname', 'is_admin', 'image', 'bio', 
             'location', 'website', 'joined_date', 'sections', 
             'created_at', 'updated_at'
         )
         read_only_fields = ('id', 'created_at', 'updated_at')
+    
+    def get_is_admin(self, obj):
+        """Get admin status for the user"""
+        return obj.user.is_staff or obj.user.is_superuser
     
     def get_image(self, obj):
         if obj.image:
