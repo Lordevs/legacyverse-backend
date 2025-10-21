@@ -994,6 +994,160 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Blog Management",
+			"item": [
+				{
+					"name": "Create Blog",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"My New Blog Post\",\n  \"content\": \"This is the content of my blog post. It can be as long as needed.\",\n  \"status\": \"public\",\n  \"content_source\": \"user_written\",\n  \"excerpt\": \"A brief description of the blog post\",\n  \"tags\": \"general,technology\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/blogs/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "blogs", ""]
+						},
+						"description": "Create a new blog post"
+					},
+					"response": []
+				},
+				{
+					"name": "List Blogs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/blogs/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "blogs", ""]
+						},
+						"description": "Get list of all blogs"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Blog Detail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/blogs/{{blog_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "blogs", "{{blog_id}}", ""]
+						},
+						"description": "Get detailed blog post with comments"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Blog",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated Blog Title\",\n  \"content\": \"Updated content of the blog post\",\n  \"status\": \"public\",\n  \"excerpt\": \"Updated excerpt\",\n  \"tags\": \"updated,technology\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/blogs/{{blog_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "blogs", "{{blog_id}}", ""]
+						},
+						"description": "Update a blog post"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Blog",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/blogs/{{blog_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "blogs", "{{blog_id}}", ""]
+						},
+						"description": "Delete a blog post"
+					},
+					"response": []
+				},
+				{
+					"name": "Like Blog",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/blogs/{{blog_id}}/like/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "blogs", "{{blog_id}}", "like", ""]
+						},
+						"description": "Like or unlike a blog post"
+					},
+					"response": []
+				},
+				{
+					"name": "Save Blog",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/blogs/{{blog_id}}/save/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "blogs", "{{blog_id}}", "save", ""]
+						},
+						"description": "Save or unsave a blog post"
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"variable": [
@@ -1038,6 +1192,12 @@
 			"value": "",
 			"type": "string",
 			"description": "Username for profile lookup"
+		},
+		{
+			"key": "blog_id",
+			"value": "",
+			"type": "string",
+			"description": "Blog ID for operations"
 		}
 	],
 	"event": [
@@ -1096,6 +1256,11 @@
 					"    // Extract image_id from image upload",
 					"    if (responseJson.id && responseJson.image) {",
 					"        pm.environment.set('image_id', responseJson.id);",
+					"    }",
+					"    ",
+					"    // Extract blog_id from blog creation",
+					"    if (responseJson.id && responseJson.title && responseJson.author) {",
+					"        pm.environment.set('blog_id', responseJson.id);",
 					"    }",
 					"}"
 				]

@@ -91,6 +91,26 @@ class BlogViewSet(ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
     
+    def create(self, request, *args, **kwargs):
+        """Override create to return full blog data like list API"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        # Get the created blog instance with all annotations
+        blog = Blog.objects.select_related('author').prefetch_related(
+            'likes', 'comments', 'saved_by_users'
+        ).annotate(
+            likes_count=Count('likes', filter=Q(likes__is_liked=True), distinct=True),
+            comments_count=Count('comments', distinct=True),
+            views_count=Count('views', distinct=True)
+        ).get(id=serializer.instance.id)
+        
+        # Use BlogListSerializer to return the same format as list API
+        response_serializer = BlogListSerializer(blog, context={'request': request})
+        headers = self.get_success_headers(response_serializer.data)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
     def perform_update(self, serializer):
         # Only allow authors to update their own blogs
         if serializer.instance.author != self.request.user:
