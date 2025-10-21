@@ -54,5 +54,8 @@ urlpatterns = [
 
     # User details by username
     path('by-username/<str:username>/', views.get_user_by_username, name='get-user-by-username'),
+    
+    # Public user profiles listing
+    path('profiles/', views.list_user_profiles, name='list-user-profiles'),
 
 ]

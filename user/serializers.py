@@ -167,6 +167,62 @@ class ProfileSerializer(serializers.ModelSerializer):
                 ).data
         
         return obj.sections  # Array order is the natural order!
+
+
+class ProfileListSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for profile lists (includes only first section to reduce data)
+    """
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    fullname = serializers.CharField(source='user.fullname', read_only=True)
+    id = serializers.UUIDField(source='user.id', read_only=True)
+    is_admin = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+    first_section = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Profile
+        fields = (
+            'id', 'username', 'email', 'fullname', 'is_admin', 'image', 'bio', 
+            'location', 'website', 'joined_date', 'first_section', 'created_at', 'updated_at'
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at')
+    
+    def get_is_admin(self, obj):
+        """Get admin status for the user"""
+        return obj.user.is_staff or obj.user.is_superuser
+    
+    def get_image(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
+    
+    def get_first_section(self, obj):
+        """Get the first section with its images if available"""
+        if not obj.sections or len(obj.sections) == 0:
+            return None
+        
+        first_section = obj.sections[0]
+        section_id = first_section.get('id')
+        
+        if section_id:
+            from .models import SectionImage
+            images = SectionImage.objects.filter(
+                profile=obj,
+                section_id=section_id
+            ).order_by('created_at')
+            
+            first_section['images'] = SectionImageSerializer(
+                images, 
+                many=True, 
+                context=self.context
+            ).data
+        
+        return first_section
     
 
 

@@ -289,6 +289,56 @@ def get_user_by_username(request, username):
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def list_user_profiles(request):
+    """
+    List all user profiles for public display (authenticated users only)
+    """
+    # Get all active profiles with their users (exclude admin users)
+    profiles = Profile.objects.filter(
+        user__is_active=True,
+        user__is_staff=False,
+        user__is_superuser=False
+    ).select_related('user').order_by('-created_at')
+    
+    # Add search functionality
+    search = request.GET.get('search')
+    if search:
+        profiles = profiles.filter(
+            models.Q(user__fullname__icontains=search) |
+            models.Q(user__username__icontains=search) |
+            models.Q(bio__icontains=search) |
+            models.Q(location__icontains=search)
+        )
+    
+    # Add filtering by location
+    location = request.GET.get('location')
+    if location:
+        profiles = profiles.filter(location__icontains=location)
+    
+    # Pagination
+    page_size = int(request.GET.get('page_size', 20))
+    page = int(request.GET.get('page', 1))
+    
+    start = (page - 1) * page_size
+    end = start + page_size
+    
+    profiles_page = profiles[start:end]
+    
+    # Serialize with ProfileListSerializer (excludes sections to reduce data)
+    from .serializers import ProfileListSerializer
+    serializer = ProfileListSerializer(profiles_page, many=True, context={'request': request})
+    
+    return Response({
+        'profiles': serializer.data,
+        'count': profiles.count(),
+        'page': page,
+        'page_size': page_size,
+        'total_pages': (profiles.count() + page_size - 1) // page_size
+    })
+
+
 # New unified profile update views
 @api_view(['PUT', 'PATCH'])
 @permission_classes([permissions.IsAuthenticated])
