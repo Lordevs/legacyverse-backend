@@ -270,12 +270,7 @@
 					"name": "List User Profiles",
 					"request": {
 						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{access_token}}"
-							}
-						],
+						"header": [],
 						"url": {
 							"raw": "{{base_url}}/api/user/profiles/?search=&location=&page=1&page_size=20",
 							"host": ["{{base_url}}"],

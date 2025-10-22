@@ -290,10 +290,10 @@ def get_user_by_username(request, username):
 
 
 @api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.AllowAny])
 def list_user_profiles(request):
     """
-    List all user profiles for public display (authenticated users only)
+    List all user profiles for public display (public endpoint)
     """
     # Get all active profiles with their users (exclude admin users)
     profiles = Profile.objects.filter(
