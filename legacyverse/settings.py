@@ -148,7 +148,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://api.memoriva.org",
     "https://memoriva.org",
-    "https://www.memoriva.org"
+    "https://www.memoriva.org","https://legacyverse.org/"
 ]
 
 CORS_ALLOW_CREDENTIALS = True
