@@ -1548,6 +1548,14 @@ def add_family_member(request):
             profile.gender = "male"
         elif relationship_type in ["mother", "daughter"]:
             profile.gender = "female"
+        elif relationship_type == "spouse":
+            # Spouse implies opposite gender — infer from the current user's gender
+            initiator_profile, _ = Profile.objects.get_or_create(user=request.user)
+            if initiator_profile.gender == "male":
+                profile.gender = "female"
+            elif initiator_profile.gender == "female":
+                profile.gender = "male"
+            # If initiator gender is unknown we leave the placeholder gender unset
         if date_of_birth:
             profile.date_of_birth = date_of_birth
         profile.save()
@@ -1565,6 +1573,35 @@ def add_family_member(request):
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    # ── Cycle detection ──────────────────────────────────────────────────────
+    # parent types: the relative would become an ancestor of the current user.
+    # child  types: the relative would become a descendant of the current user.
+    # Spouse links carry no parent-child hierarchy, so no cycle is possible.
+    if relationship_type in ["father", "mother"]:
+        # B becomes A's parent → B must NOT already be a descendant of A
+        if relative.id in _get_descendants(request.user):
+            return Response(
+                {
+                    "error": (
+                        "This person is already a descendant in your family tree "
+                        "and cannot be added as a parent."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    elif relationship_type in ["son", "daughter"]:
+        # B becomes A's child → A must NOT already be a descendant of B
+        if request.user.id in _get_descendants(relative):
+            return Response(
+                {
+                    "error": (
+                        "This person is already an ancestor in your family tree "
+                        "and cannot be added as a child."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     # Create relationship record
     relationship = FamilyRelationship.objects.create(
@@ -1650,16 +1687,24 @@ def respond_to_family_request(request, request_id):
 
         # If the user accepts a relationship, check if we need to update their own gender
         # if it is 'prefer_not_to_say' and we can infer it.
-        # e.g. A added current user B as "Mother". This means B is female.
-        # Let's set B's gender to 'female' if it is currently 'prefer_not_to_say'.
         profile, _ = Profile.objects.get_or_create(user=request.user)
         if profile.gender == "prefer_not_to_say":
-            if relationship.relationship_type in ["mother", "daughter"]:
+            rel_type = relationship.relationship_type
+            if rel_type in ["mother", "daughter"]:
                 profile.gender = "female"
                 profile.save()
-            elif relationship.relationship_type in ["father", "son"]:
+            elif rel_type in ["father", "son"]:
                 profile.gender = "male"
                 profile.save()
+            elif rel_type == "spouse":
+                # Infer opposite gender from the initiator's profile
+                initiator_profile, _ = Profile.objects.get_or_create(user=relationship.user)
+                if initiator_profile.gender == "male":
+                    profile.gender = "female"
+                    profile.save()
+                elif initiator_profile.gender == "female":
+                    profile.gender = "male"
+                    profile.save()
 
         return Response(
             {"message": "Relationship request accepted."},
@@ -1672,6 +1717,55 @@ def respond_to_family_request(request, request_id):
             {"message": "Relationship request rejected."},
             status=status.HTTP_200_OK,
         )
+
+def _get_descendants(user, exclude_relationship_id=None):
+    """
+    BFS traversal to collect all descendant user IDs of `user`.
+    A "descendant" is any person reachable by following child links:
+      - FamilyRelationship(user=X, relative=Y, type in [son, daughter])  → Y is X's child
+      - FamilyRelationship(user=X, relative=Y, type in [father, mother]) → X is Y's child
+
+    `exclude_relationship_id` lets us ignore a specific relationship record
+    (used during edits so we don't count the old type of the relationship being changed).
+    """
+    visited = {user.id}
+    descendants = set()
+    queue = [user]
+
+    while queue:
+        current = queue.pop(0)
+
+        # Pattern 1: current is the initiator and added someone as their child
+        qs1 = FamilyRelationship.objects.filter(
+            user=current,
+            relationship_type__in=["son", "daughter"],
+            status="accepted",
+        ).select_related("relative")
+        if exclude_relationship_id:
+            qs1 = qs1.exclude(id=exclude_relationship_id)
+
+        for rel in qs1:
+            if rel.relative.id not in visited:
+                visited.add(rel.relative.id)
+                descendants.add(rel.relative.id)
+                queue.append(rel.relative)
+
+        # Pattern 2: current is the relative and someone added current as their parent
+        qs2 = FamilyRelationship.objects.filter(
+            relative=current,
+            relationship_type__in=["father", "mother"],
+            status="accepted",
+        ).select_related("user")
+        if exclude_relationship_id:
+            qs2 = qs2.exclude(id=exclude_relationship_id)
+
+        for rel in qs2:
+            if rel.user.id not in visited:
+                visited.add(rel.user.id)
+                descendants.add(rel.user.id)
+                queue.append(rel.user)
+
+    return descendants
 
 
 def _get_inverted_relationship(relationship_type, initiator_gender):
@@ -1860,6 +1954,32 @@ def edit_family_relationship(request, relationship_id):
             status=status.HTTP_200_OK,
         )
 
+    # ── Cycle detection for the new type ─────────────────────────────────────
+    # Exclude the existing record so the check isn't polluted by its current type.
+    relative = relationship.relative
+    if new_type in ["father", "mother"]:
+        if relative.id in _get_descendants(request.user, exclude_relationship_id=relationship.id):
+            return Response(
+                {
+                    "error": (
+                        "This person is already a descendant in your family tree "
+                        "and cannot be changed to a parent role."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    elif new_type in ["son", "daughter"]:
+        if request.user.id in _get_descendants(relative, exclude_relationship_id=relationship.id):
+            return Response(
+                {
+                    "error": (
+                        "This person is already an ancestor in your family tree "
+                        "and cannot be changed to a child role."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     relationship.relationship_type = new_type
 
     # Handle status resets and gender inferences
@@ -1876,6 +1996,15 @@ def edit_family_relationship(request, relationship_id):
         elif new_type in ["mother", "daughter"]:
             profile.gender = "female"
             profile.save()
+        elif new_type == "spouse":
+            # Infer placeholder's gender as opposite of the current user's gender
+            initiator_profile, _ = Profile.objects.get_or_create(user=request.user)
+            if initiator_profile.gender == "male":
+                profile.gender = "female"
+                profile.save()
+            elif initiator_profile.gender == "female":
+                profile.gender = "male"
+                profile.save()
 
     relationship.save()
 

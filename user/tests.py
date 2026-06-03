@@ -274,3 +274,64 @@ class FamilyTreeTestCase(APITestCase):
         rel.refresh_from_db()
         self.assertEqual(rel.relationship_type, "mother")
         self.assertEqual(rel.status, "pending")
+
+    def test_cycle_detection_blocks_invalid_ancestor(self):
+        """
+        3-node chain: A → son → B → son → C.
+        C then tries to add A as their son → A is already C's ancestor → cycle → 400.
+        """
+        user_c = User.objects.create_user(
+            email="userc_cycle@example.com", password="Password123!", fullname="User C"
+        )
+
+        # A's son is B (accepted)
+        FamilyRelationship.objects.create(
+            user=self.user_a,
+            relative=self.user_b,
+            relationship_type="son",
+            status="accepted",
+        )
+        # B's son is C (accepted)
+        FamilyRelationship.objects.create(
+            user=self.user_b,
+            relative=user_c,
+            relationship_type="son",
+            status="accepted",
+        )
+
+        # C tries to add A as son → A is already C's ancestor → cycle
+        self.client.force_authenticate(user=user_c)
+        cycle_data = {
+            "email": self.user_a.email,
+            "fullname": self.user_a.fullname,
+            "relationship_type": "son",
+        }
+        response = self.client.post(self.add_url, cycle_data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("ancestor", response.data["error"])
+
+
+    def test_cycle_detection_allows_valid_tree(self):
+        """
+        A valid multi-generation chain should not be blocked.
+        A → son → B, B → son → C  (A is grandparent of C — perfectly valid).
+        """
+        user_c = User.objects.create_user(
+            email="userc_valid@example.com", password="Password123!", fullname="User C"
+        )
+        # A's son is B
+        FamilyRelationship.objects.create(
+            user=self.user_a,
+            relative=self.user_b,
+            relationship_type="son",
+            status="accepted",
+        )
+        # B's son is C
+        self.client.force_authenticate(user=self.user_b)
+        data = {
+            "email": user_c.email,
+            "fullname": user_c.fullname,
+            "relationship_type": "son",
+        }
+        response = self.client.post(self.add_url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
