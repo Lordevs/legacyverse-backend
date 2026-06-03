@@ -73,6 +73,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     fullname = models.CharField(max_length=255)
     is_verified = models.BooleanField(default=False)
+    is_invited = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -103,6 +104,14 @@ class Profile(models.Model):
     location = models.CharField(max_length=100, blank=True)
     website = models.URLField(blank=True)
     joined_date = models.DateField(null=True, blank=True, help_text="User-provided joined date")
+    
+    GENDER_CHOICES = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+        ('prefer_not_to_say', 'Prefer not to say'),
+    ]
+    gender = models.CharField(max_length=20, choices=GENDER_CHOICES, default='prefer_not_to_say')
     
     # Dynamic sections as JSON array - super simple!
     sections = models.JSONField(default=list, blank=True, help_text="Array of profile sections")
@@ -235,6 +244,33 @@ class SectionImage(models.Model):
         return f"Image for section {self.section_id}"
 
 
+class FamilyRelationship(models.Model):
+    RELATIONSHIP_CHOICES = [
+        ('father', 'Father'),
+        ('mother', 'Mother'),
+        ('son', 'Son'),
+        ('daughter', 'Daughter'),
+        ('spouse', 'Spouse'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='initiated_relationships')
+    relative = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_relationships')
+    relationship_type = models.CharField(max_length=20, choices=RELATIONSHIP_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('user', 'relative')
+        
+    def __str__(self):
+        return f"{self.user.fullname} -> {self.relationship_type} -> {self.relative.fullname} ({self.status})"
 
 
 class PasswordResetToken(models.Model):

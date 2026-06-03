@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if is_new_user %}Family Invitation{% else %}Family Connection Request{% endif %} - {{ site_name }}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #18181b;
+            background-color: #fafafa;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+        .wrapper {
+            width: 100%;
+            background-color: #fafafa;
+            padding: 48px 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            max-width: 560px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border: 1px solid #e4e4e7;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.01), 0 1px 2px rgba(0, 0, 0, 0.02);
+        }
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: #18181b;
+            letter-spacing: -0.05em;
+            margin-bottom: 24px;
+        }
+        h2 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #18181b;
+            letter-spacing: -0.03em;
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+        p {
+            font-size: 15px;
+            color: #3f3f46;
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+        .btn-container {
+            text-align: left;
+            margin: 28px 0;
+        }
+        .button {
+            display: inline-block;
+            background-color: #18181b;
+            color: #ffffff;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            border-radius: 6px;
+            border: 1px solid #18181b;
+            transition: background-color 0.15s ease;
+        }
+        .button:hover {
+            background-color: #27272a;
+        }
+        .link-text {
+            word-break: break-all;
+            background-color: #f4f4f5;
+            border: 1px solid #e4e4e7;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 12px;
+            color: #52525b;
+            margin: 16px 0;
+        }
+        .info-card {
+            background-color: #f4f4f5;
+            border: 1px solid #e4e4e7;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 24px 0;
+        }
+        .info-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #18181b;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .info-desc {
+            font-size: 13px;
+            color: #52525b;
+            margin: 0;
+        }
+        .divider {
+            height: 1px;
+            background-color: #e4e4e7;
+            margin: 32px 0;
+        }
+        .footer {
+            font-size: 13px;
+            color: #71717a;
+            line-height: 1.5;
+        }
+        .footer a {
+            color: #18181b;
+            text-decoration: underline;
+        }
+        .copyright {
+            font-size: 12px;
+            color: #a1a1aa;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="container">
+            <div class="logo">{{ site_name }}</div>
+            
+            {% if is_new_user %}
+            <h2>You've been invited to join {{ site_name }}</h2>
+            <p>Hello {{ receiver_name }},</p>
+            <p><strong>{{ sender.fullname }}</strong> has invited you to join their Family Tree on {{ site_name }} as their <strong>{{ relationship_type }}</strong>.</p>
+            <p>By registering, you can claim your spot in the family network, preserve your own memories, and extend the family tree from your side by connecting with your spouse and children.</p>
+            
+            <div class="btn-container">
+                <a href="{{ action_url }}" class="button" style="color: #ffffff;">Accept Invitation & Register</a>
+            </div>
+            {% else %}
+            <h2>New Family Relationship Request</h2>
+            <p>Hello {{ receiver_name }},</p>
+            <p><strong>{{ sender.fullname }}</strong> has added you as their <strong>{{ relationship_type }}</strong> on {{ site_name }}.</p>
+            <p>Please log in to your account and review the pending request to verify this connection and build your family tree.</p>
+            
+            <div class="btn-container">
+                <a href="{{ action_url }}" class="button" style="color: #ffffff;">Review Request</a>
+            </div>
+            {% endif %}
+            
+            <p>If you're having trouble with the button, copy and paste this URL into your browser:</p>
+            <div class="link-text">{{ action_url }}</div>
+            
+            <div class="info-card">
+                <span class="info-title">About {{ site_name }}</span>
+                <p class="info-desc">{{ site_name }} is a premium digital memoir platform where families securely preserve and share their legacies, stories, and heritage across generations.</p>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="footer">
+                <p>If you have any questions, please contact us at <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+                <div class="copyright">&copy; {% now "Y" %} {{ site_name }}. All rights reserved.</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

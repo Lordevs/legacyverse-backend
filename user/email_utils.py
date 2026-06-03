@@ -178,3 +178,52 @@ def send_password_change_confirmation(user):
             f"Failed to send password change confirmation to {user.email}: {str(e)}"
         )
         return False
+
+
+def send_family_invitation_email(sender, receiver_email, receiver_name, relationship_type, is_new_user):
+    """
+    Send family invitation/notification email
+
+    Args:
+        sender: User instance who sent the request
+        receiver_email: String email address of the receiver
+        receiver_name: String name of the receiver
+        relationship_type: String representation of relationship (e.g. 'Father')
+        is_new_user: Boolean indicating if they need to register (True) or just accept request (False)
+    """
+    try:
+        if is_new_user:
+            subject = f"{sender.fullname} invited you to join their Family Tree on LegacyVerse"
+            action_url = f"{settings.FRONTEND_URL}/register?email={receiver_email}"
+        else:
+            subject = f"New Family Relationship Request from {sender.fullname}"
+            action_url = f"{settings.FRONTEND_URL}/family/requests"
+
+        context = {
+            "sender": sender,
+            "receiver_name": receiver_name,
+            "relationship_type": relationship_type,
+            "is_new_user": is_new_user,
+            "action_url": action_url,
+            "site_name": "LegacyVerse",
+            "support_email": settings.DEFAULT_FROM_EMAIL,
+        }
+
+        html_message = render_to_string("emails/family_invitation.html", context)
+        plain_message = render_to_string("emails/family_invitation.txt", context)
+
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[receiver_email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+
+        logger.info(f"Family invitation email sent to {receiver_email}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send family invitation email to {receiver_email}: {str(e)}")
+        return False

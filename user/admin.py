@@ -1,19 +1,19 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, Profile, PasswordResetToken
+from .models import User, Profile, PasswordResetToken, FamilyRelationship
 
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
-    list_display = ('email', 'fullname', 'username', 'is_verified', 'is_active', 'created_at')
-    list_filter = ('is_verified', 'is_active', 'is_staff', 'created_at')
+    list_display = ('email', 'fullname', 'username', 'is_verified', 'is_invited', 'is_active', 'created_at')
+    list_filter = ('is_verified', 'is_invited', 'is_active', 'is_staff', 'created_at')
     search_fields = ('email', 'fullname', 'username')
     ordering = ('-created_at',)
     
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
         ('Personal info', {'fields': ('fullname', 'username')}),
-        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'is_verified', 'groups', 'user_permissions')}),
+        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'is_verified', 'is_invited', 'groups', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'date_joined', 'created_at', 'updated_at')}),
     )
     
@@ -31,14 +31,14 @@ class CustomUserAdmin(UserAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'location', 'joined_date', 'created_at')
-    list_filter = ('created_at', 'updated_at', 'joined_date')
+    list_display = ('user', 'gender', 'location', 'joined_date', 'created_at')
+    list_filter = ('gender', 'created_at', 'updated_at', 'joined_date')
     search_fields = ('user__email', 'user__fullname', 'location')
     readonly_fields = ('created_at', 'updated_at')
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('user', 'image', 'bio', 'location', 'website', 'joined_date')
+            'fields': ('user', 'image', 'bio', 'location', 'website', 'joined_date', 'gender')
         }),
         ('Life Details', {
             'fields': ('education_json', 'hobbies', 'early_childhood')
@@ -62,3 +62,10 @@ class PasswordResetTokenAdmin(admin.ModelAdmin):
     list_filter = ('is_used', 'created_at', 'expires_at')
     search_fields = ('user__email', 'user__fullname')
     readonly_fields = ('token', 'created_at')
+
+
+@admin.register(FamilyRelationship)
+class FamilyRelationshipAdmin(admin.ModelAdmin):
+    list_display = ('user', 'relationship_type', 'relative', 'status', 'created_at')
+    list_filter = ('relationship_type', 'status', 'created_at')
+    search_fields = ('user__email', 'user__fullname', 'relative__email', 'relative__fullname')

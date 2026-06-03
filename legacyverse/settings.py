@@ -267,6 +267,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Blogs", "description": "Blog CRUD, likes, saves, and view tracking"},
         {"name": "Comments", "description": "Blog comments and replies"},
         {"name": "AI", "description": "OpenAI-powered blog generation and rewriting"},
+        {"name": "Family Tree", "description": "Immediate family relationships and interactive family tree graph"},
         {"name": "Public", "description": "Public listing / lookup endpoints"},
     ],
 }

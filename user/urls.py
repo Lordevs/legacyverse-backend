@@ -49,6 +49,13 @@ urlpatterns = [
     path('admin/users/<uuid:user_id>/profile/sections/<str:section_id>/images/', views.admin_upload_user_section_images, name='admin_upload_user_section_images'),
     path('admin/users/<uuid:user_id>/profile/sections/<str:section_id>/images/<int:image_id>/', views.admin_user_section_image_detail, name='admin_user_section_image_detail'),
     
+    # Family Tree URLs
+    path('family/add/', views.add_family_member, name='add_family_member'),
+    path('family/requests/', views.list_family_requests, name='list_family_requests'),
+    path('family/requests/<int:request_id>/respond/', views.respond_to_family_request, name='respond_to_family_request'),
+    path('family/members/', views.list_family_members, name='list_family_members'),
+    path('family/tree/', views.get_family_tree, name='get_family_tree'),
+
     # Username pattern should be last to avoid conflicts
     path('profile/<str:username>/', views.get_profile_by_username, name='profile_by_username'),
 

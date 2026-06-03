@@ -1,0 +1,34 @@
+{% if is_new_user %}
+Family Invitation - {{ site_name }}
+===================================
+
+Hello {{ receiver_name }},
+
+{{ sender.fullname }} has invited you to join their Family Tree on {{ site_name }} as their {{ relationship_type }}.
+
+By registering, you can claim your spot in the family network, preserve your own memories, and extend the family tree from your side by connecting with your spouse and children.
+
+Accept Invitation & Register:
+{{ action_url }}
+{% else %}
+Family Connection Request - {{ site_name }}
+===========================================
+
+Hello {{ receiver_name }},
+
+{{ sender.fullname }} has added you as their {{ relationship_type }} on {{ site_name }}.
+
+Please log in to your account and review the pending request to verify this connection and build your family tree.
+
+Review Request:
+{{ action_url }}
+{% endif %}
+
+---
+
+About {{ site_name }}:
+{{ site_name }} is a premium digital memoir platform where families securely preserve and share their legacies, stories, and heritage across generations.
+
+If you have any questions, please contact us at {{ support_email }}.
+
+© {% now "Y" %} {{ site_name }}. All rights reserved.

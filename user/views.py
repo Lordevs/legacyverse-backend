@@ -9,7 +9,7 @@ from datetime import timedelta
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import serializers as rf_serializers
 
-from .models import User, Profile, PasswordResetToken, SectionImage
+from .models import User, Profile, PasswordResetToken, SectionImage, FamilyRelationship
 from .serializers import (
     UserRegistrationSerializer,
     UserLoginSerializer,
@@ -21,11 +21,17 @@ from .serializers import (
     ResetPasswordSerializer,
     SectionImageSerializer,
     ProfileListSerializer,
+    FamilyMemberAddSerializer,
+    FamilyRelationshipRequestSerializer,
+    FamilyRequestRespondSerializer,
+    FamilyTreeMemberSerializer,
+    FamilyTreeResponseSerializer,
 )
 from .email_utils import (
     send_password_reset_email,
     send_welcome_email,
     send_password_change_confirmation,
+    send_family_invitation_email,
 )
 
 
@@ -1484,3 +1490,297 @@ def admin_user_section_image_detail(request, user_id, section_id, image_id):
         return Response(
             {"message": "Image deleted successfully"}, status=status.HTTP_200_OK
         )
+
+
+# ── Family Tree Views ────────────────────────────────────────────────────────
+
+
+@extend_schema(
+    tags=["Family Tree"],
+    request=FamilyMemberAddSerializer,
+    responses={201: _MessageSerializer, 400: _ErrorSerializer},
+    summary="Add an immediate family member",
+)
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def add_family_member(request):
+    """
+    Add an immediate family member (Father, Mother, Son, Daughter, Spouse).
+    If the relative does not exist, a placeholder user is created.
+    """
+    serializer = FamilyMemberAddSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    email = serializer.validated_data["email"].lower()
+    fullname = serializer.validated_data["fullname"]
+    relationship_type = serializer.validated_data["relationship_type"]
+
+    if email == request.user.email.lower():
+        return Response(
+            {"error": "You cannot add yourself as a family member."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    normalized_email = User.objects.normalize_email(email)
+
+    # Check if user already exists
+    relative = User.objects.filter(email__iexact=normalized_email).first()
+    is_new_user = False
+
+    if not relative:
+        # Create invited placeholder user
+        is_new_user = True
+        relative = User.objects.create(
+            email=normalized_email,
+            fullname=fullname,
+            is_invited=True,
+            is_active=True,
+        )
+        relative.set_unusable_password()
+        relative.save()
+
+        # Inferred profile gender
+        profile, _ = Profile.objects.get_or_create(user=relative)
+        if relationship_type in ["father", "son"]:
+            profile.gender = "male"
+        elif relationship_type in ["mother", "daughter"]:
+            profile.gender = "female"
+        profile.save()
+
+    # Check if a relationship already exists in either direction
+    existing_relationship = FamilyRelationship.objects.filter(
+        (models.Q(user=request.user) & models.Q(relative=relative))
+        | (models.Q(user=relative) & models.Q(relative=request.user))
+    ).first()
+
+    if existing_relationship:
+        return Response(
+            {
+                "error": "A relationship request between you and this user already exists."
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Create relationship record
+    relationship = FamilyRelationship.objects.create(
+        user=request.user,
+        relative=relative,
+        relationship_type=relationship_type,
+        status="pending",
+    )
+
+    # If the relative is an invited/placeholder account, automatically accept the relationship
+    if relative.is_invited:
+        relationship.status = "accepted"
+        relationship.save()
+
+    # Send email notification
+    send_family_invitation_email(
+        sender=request.user,
+        receiver_email=normalized_email,
+        receiver_name=fullname,
+        relationship_type=relationship.get_relationship_type_display(),
+        is_new_user=is_new_user,
+    )
+
+    msg = (
+        "Invitation email sent and placeholder created."
+        if is_new_user
+        else "Family relationship request sent."
+    )
+    if relative.is_invited:
+        msg = "Family member added and invitation email sent."
+
+    return Response({"message": msg}, status=status.HTTP_201_CREATED)
+
+
+@extend_schema(
+    tags=["Family Tree"],
+    responses={200: FamilyRelationshipRequestSerializer(many=True)},
+    summary="List pending family requests received",
+)
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def list_family_requests(request):
+    """
+    List all pending family relationship requests received by the current user.
+    """
+    requests = FamilyRelationship.objects.filter(
+        relative=request.user, status="pending"
+    ).select_related("user")
+    serializer = FamilyRelationshipRequestSerializer(requests, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    tags=["Family Tree"],
+    request=FamilyRequestRespondSerializer,
+    responses={200: _MessageSerializer, 400: _ErrorSerializer, 404: _ErrorSerializer},
+    summary="Respond to a family request",
+)
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def respond_to_family_request(request, request_id):
+    """
+    Accept or reject a pending family relationship request.
+    """
+    try:
+        relationship = FamilyRelationship.objects.get(
+            id=request_id, relative=request.user, status="pending"
+        )
+    except FamilyRelationship.DoesNotExist:
+        return Response(
+            {"error": "Pending request not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    serializer = FamilyRequestRespondSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    action = serializer.validated_data["action"]
+    if action == "accept":
+        relationship.status = "accepted"
+        relationship.save()
+
+        # If the user accepts a relationship, check if we need to update their own gender
+        # if it is 'prefer_not_to_say' and we can infer it.
+        # e.g. A added current user B as "Mother". This means B is female.
+        # Let's set B's gender to 'female' if it is currently 'prefer_not_to_say'.
+        profile, _ = Profile.objects.get_or_create(user=request.user)
+        if profile.gender == "prefer_not_to_say":
+            if relationship.relationship_type in ["mother", "daughter"]:
+                profile.gender = "female"
+                profile.save()
+            elif relationship.relationship_type in ["father", "son"]:
+                profile.gender = "male"
+                profile.save()
+
+        return Response(
+            {"message": "Relationship request accepted."},
+            status=status.HTTP_200_OK,
+        )
+    elif action == "reject":
+        relationship.status = "rejected"
+        relationship.save()
+        return Response(
+            {"message": "Relationship request rejected."},
+            status=status.HTTP_200_OK,
+        )
+
+
+def _get_inverted_relationship(relationship_type, initiator_gender):
+    if relationship_type in ["father", "mother"]:
+        if initiator_gender == "male":
+            return "Son"
+        elif initiator_gender == "female":
+            return "Daughter"
+        else:
+            return "Child"
+    elif relationship_type in ["son", "daughter"]:
+        if initiator_gender == "male":
+            return "Father"
+        elif initiator_gender == "female":
+            return "Mother"
+        else:
+            return "Parent"
+    elif relationship_type == "spouse":
+        return "Spouse"
+    return "Relative"
+
+
+@extend_schema(
+    tags=["Family Tree"],
+    responses={200: FamilyTreeMemberSerializer(many=True)},
+    summary="List all accepted family members",
+)
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def list_family_members(request):
+    """
+    List all accepted family members with relationship labels.
+    """
+    relationships = FamilyRelationship.objects.filter(
+        (models.Q(user=request.user) | models.Q(relative=request.user)),
+        status="accepted",
+    ).select_related("user__profile", "relative__profile")
+
+    members_data = []
+    for rel in relationships:
+        if rel.user == request.user:
+            member = rel.relative
+            relationship_label = rel.get_relationship_type_display()
+        else:
+            member = rel.user
+            relationship_label = _get_inverted_relationship(
+                rel.relationship_type, rel.user.profile.gender
+            )
+
+        serialized_member = FamilyTreeMemberSerializer(
+            member, context={"request": request}
+        ).data
+        serialized_member["relationship"] = relationship_label
+        members_data.append(serialized_member)
+
+    return Response(members_data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    tags=["Family Tree"],
+    responses={200: FamilyTreeResponseSerializer},
+    summary="Get full family tree (graph)",
+)
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def get_family_tree(request):
+    """
+    Retrieve the entire connected family tree using BFS traversal.
+    """
+    visited_nodes = {request.user.id}
+    nodes = [request.user]
+    edges = []
+    added_edges = set()
+    queue = [request.user]
+
+    while queue:
+        current_user = queue.pop(0)
+
+        # Get all accepted relationships for current_user
+        relations = FamilyRelationship.objects.filter(
+            (models.Q(user=current_user) | models.Q(relative=current_user)),
+            status="accepted",
+        ).select_related("user__profile", "relative__profile")
+
+        for rel in relations:
+            neighbor = rel.relative if rel.user == current_user else rel.user
+
+            # Record the edge uniquely
+            edge_id = f"{rel.user.id}-{rel.relative.id}"
+            if edge_id not in added_edges:
+                added_edges.add(edge_id)
+                edges.append(
+                    {
+                        "source": rel.user.id,
+                        "target": rel.relative.id,
+                        "relationship": rel.relationship_type,
+                    }
+                )
+
+            if neighbor.id not in visited_nodes:
+                visited_nodes.add(neighbor.id)
+                nodes.append(neighbor)
+                queue.append(neighbor)
+
+    # Serialize nodes
+    nodes_serializer = FamilyTreeMemberSerializer(
+        nodes, many=True, context={"request": request}
+    )
+
+    return Response(
+        {
+            "nodes": nodes_serializer.data,
+            "edges": edges,
+        },
+        status=status.HTTP_200_OK,
+    )
