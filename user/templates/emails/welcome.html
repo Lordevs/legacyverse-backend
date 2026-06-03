@@ -6,71 +6,109 @@
     <title>Welcome to {{ site_name }}</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             line-height: 1.6;
-            color: #333;
-            max-width: 600px;
+            color: #18181b;
+            background-color: #fafafa;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+        .wrapper {
+            width: 100%;
+            background-color: #fafafa;
+            padding: 48px 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            max-width: 560px;
             margin: 0 auto;
-            padding: 20px;
+            background-color: #ffffff;
+            border: 1px solid #e4e4e7;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.01), 0 1px 2px rgba(0, 0, 0, 0.02);
         }
-        .header {
-            background-color: #27ae60;
-            color: white;
-            padding: 20px;
-            text-align: center;
-            border-radius: 8px 8px 0 0;
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: #18181b;
+            letter-spacing: -0.05em;
+            margin-bottom: 24px;
         }
-        .content {
-            background-color: #f8f9fa;
-            padding: 30px;
-            border-radius: 0 0 8px 8px;
+        h2 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #18181b;
+            letter-spacing: -0.03em;
+            margin-top: 0;
+            margin-bottom: 16px;
         }
-        .button {
-            display: inline-block;
-            background-color: #3498db;
-            color: white;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 5px;
+        p {
+            font-size: 15px;
+            color: #3f3f46;
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+        .features-list {
+            padding-left: 20px;
+            font-size: 14px;
+            color: #52525b;
             margin: 20px 0;
         }
+        .features-list li {
+            margin-bottom: 8px;
+        }
+        .divider {
+            height: 1px;
+            background-color: #e4e4e7;
+            margin: 32px 0;
+        }
         .footer {
-            text-align: center;
-            margin-top: 30px;
+            font-size: 13px;
+            color: #71717a;
+            line-height: 1.5;
+        }
+        .footer a {
+            color: #18181b;
+            text-decoration: underline;
+        }
+        .copyright {
             font-size: 12px;
-            color: #666;
+            color: #a1a1aa;
+            margin-top: 16px;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Welcome to {{ site_name }}!</h1>
-    </div>
-    
-    <div class="content">
-        <h2>Hello {{ user.fullname }},</h2>
-        
-        <p>Welcome to {{ site_name }}! We're excited to have you join our community.</p>
-        
-        <p>Your account has been successfully created with the email: <strong>{{ user.email }}</strong></p>
-        
-        <p>You can now:</p>
-        <ul>
-            <li>Complete your profile</li>
-            <li>Share your legacy stories</li>
-            <li>Connect with other community members</li>
-            <li>Explore inspiring content</li>
-        </ul>
-        
-        <p>If you have any questions or need help getting started, don't hesitate to reach out to our support team.</p>
-        
-        <p>Best regards,<br>
-        The {{ site_name }} Team</p>
-    </div>
-    
-    <div class="footer">
-        <p>If you have any questions, please contact us at <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
-        <p>&copy; 2024 {{ site_name }}. All rights reserved.</p>
+    <div class="wrapper">
+        <div class="container">
+            <div class="logo">{{ site_name }}</div>
+            
+            <h2>Welcome to {{ site_name }}!</h2>
+            
+            <p>Hello {{ user.fullname }},</p>
+            <p>We're thrilled to welcome you to our community. {{ site_name }} is a preservation space dedicated to sharing legacies, memories, and personal stories.</p>
+            
+            <p>Your account has been successfully created with: <strong>{{ user.email }}</strong></p>
+            
+            <p>Here are a few things you can do to get started:</p>
+            <ul class="features-list">
+                <li>Complete your profile details.</li>
+                <li>Share your first memory or story section.</li>
+                <li>Invite family members to start building your Family Tree.</li>
+                <li>Explore memoirs and stories from others.</li>
+            </ul>
+            
+            <p>We're excited to see the stories and heritage you preserve!</p>
+            
+            <div class="divider"></div>
+            
+            <div class="footer">
+                <p>If you have any questions or need assistance, feel free to reply to this email or contact us at <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+                <div class="copyright">&copy; {% now "Y" %} {{ site_name }}. All rights reserved.</div>
+            </div>
+        </div>
     </div>
 </body>
 </html>
