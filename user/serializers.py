@@ -177,6 +177,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "website",
             "joined_date",
             "gender",
+            "date_of_birth",
             "sections",
             "created_at",
             "updated_at",
@@ -375,6 +376,7 @@ class FamilyMemberAddSerializer(serializers.Serializer):
     relationship_type = serializers.ChoiceField(
         choices=FamilyRelationship.RELATIONSHIP_CHOICES
     )
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
 
 
 class FamilyRelationshipRequestSerializer(serializers.ModelSerializer):
@@ -407,11 +409,20 @@ class FamilyTreeMemberSerializer(serializers.ModelSerializer):
     email = serializers.EmailField()
     username = serializers.CharField(read_only=True)
     gender = serializers.CharField(source="profile.gender", read_only=True)
+    date_of_birth = serializers.DateField(source="profile.date_of_birth", read_only=True)
     image = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ("id", "fullname", "email", "username", "gender", "image")
+        fields = (
+            "id",
+            "fullname",
+            "email",
+            "username",
+            "gender",
+            "date_of_birth",
+            "image",
+        )
 
     def get_image(self, obj):
         try:

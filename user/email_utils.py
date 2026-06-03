@@ -194,7 +194,7 @@ def send_family_invitation_email(sender, receiver_email, receiver_name, relation
     try:
         if is_new_user:
             subject = f"{sender.fullname} invited you to join their Family Tree on LegacyVerse"
-            action_url = f"{settings.FRONTEND_URL}/register?email={receiver_email}"
+            action_url = f"{settings.FRONTEND_URL}/?action=register&email={receiver_email}"
         else:
             subject = f"New Family Relationship Request from {sender.fullname}"
             action_url = f"{settings.FRONTEND_URL}/family/requests"

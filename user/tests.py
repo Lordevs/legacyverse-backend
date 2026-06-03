@@ -62,6 +62,7 @@ class FamilyTreeTestCase(APITestCase):
             "email": "invited@example.com",
             "fullname": "Invited User",
             "relationship_type": "son",
+            "date_of_birth": "2000-01-01"
         }
         response = self.client.post(self.add_url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -71,8 +72,9 @@ class FamilyTreeTestCase(APITestCase):
         self.assertTrue(invited_user.is_invited)
         self.assertEqual(invited_user.fullname, "Invited User")
 
-        # Check inferred gender on the profile
+        # Check inferred gender and date of birth on the profile
         self.assertEqual(invited_user.profile.gender, "male")
+        self.assertEqual(str(invited_user.profile.date_of_birth), "2000-01-01")
 
         # Verify accepted relationship (since they are invited/placeholder)
         rel = FamilyRelationship.objects.get(user=self.user_a, relative=invited_user)

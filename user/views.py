@@ -1515,6 +1515,7 @@ def add_family_member(request):
     email = serializer.validated_data["email"].lower()
     fullname = serializer.validated_data["fullname"]
     relationship_type = serializer.validated_data["relationship_type"]
+    date_of_birth = serializer.validated_data.get("date_of_birth")
 
     if email == request.user.email.lower():
         return Response(
@@ -1546,6 +1547,8 @@ def add_family_member(request):
             profile.gender = "male"
         elif relationship_type in ["mother", "daughter"]:
             profile.gender = "female"
+        if date_of_birth:
+            profile.date_of_birth = date_of_birth
         profile.save()
 
     # Check if a relationship already exists in either direction

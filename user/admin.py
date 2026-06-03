@@ -31,14 +31,14 @@ class CustomUserAdmin(UserAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'gender', 'location', 'joined_date', 'created_at')
-    list_filter = ('gender', 'created_at', 'updated_at', 'joined_date')
+    list_display = ('user', 'gender', 'date_of_birth', 'location', 'joined_date', 'created_at')
+    list_filter = ('gender', 'date_of_birth', 'created_at', 'updated_at', 'joined_date')
     search_fields = ('user__email', 'user__fullname', 'location')
     readonly_fields = ('created_at', 'updated_at')
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('user', 'image', 'bio', 'location', 'website', 'joined_date', 'gender')
+            'fields': ('user', 'image', 'bio', 'location', 'website', 'joined_date', 'gender', 'date_of_birth')
         }),
         ('Life Details', {
             'fields': ('education_json', 'hobbies', 'early_childhood')
