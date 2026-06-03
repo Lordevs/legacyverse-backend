@@ -438,6 +438,7 @@ class FamilyTreeMemberSerializer(serializers.ModelSerializer):
 
 
 class FamilyTreeEdgeSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
     source = serializers.UUIDField()
     target = serializers.UUIDField()
     relationship = serializers.CharField()
@@ -446,3 +447,9 @@ class FamilyTreeEdgeSerializer(serializers.Serializer):
 class FamilyTreeResponseSerializer(serializers.Serializer):
     nodes = FamilyTreeMemberSerializer(many=True)
     edges = FamilyTreeEdgeSerializer(many=True)
+
+
+class FamilyRelationshipUpdateSerializer(serializers.Serializer):
+    relationship_type = serializers.ChoiceField(
+        choices=FamilyRelationship.RELATIONSHIP_CHOICES
+    )

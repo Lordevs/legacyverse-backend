@@ -55,6 +55,8 @@ urlpatterns = [
     path('family/requests/<int:request_id>/respond/', views.respond_to_family_request, name='respond_to_family_request'),
     path('family/members/', views.list_family_members, name='list_family_members'),
     path('family/tree/', views.get_family_tree, name='get_family_tree'),
+    path('family/relations/<int:relationship_id>/', views.revoke_family_relationship, name='revoke_family_relationship'),
+    path('family/relations/<int:relationship_id>/edit/', views.edit_family_relationship, name='edit_family_relationship'),
 
     # Username pattern should be last to avoid conflicts
     path('profile/<str:username>/', views.get_profile_by_username, name='profile_by_username'),

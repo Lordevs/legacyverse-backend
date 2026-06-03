@@ -26,6 +26,7 @@ from .serializers import (
     FamilyRequestRespondSerializer,
     FamilyTreeMemberSerializer,
     FamilyTreeResponseSerializer,
+    FamilyRelationshipUpdateSerializer,
 )
 from .email_utils import (
     send_password_reset_email,
@@ -1724,6 +1725,8 @@ def list_family_members(request):
             member, context={"request": request}
         ).data
         serialized_member["relationship"] = relationship_label
+        serialized_member["relationship_id"] = rel.id
+        serialized_member["is_initiator"] = rel.user == request.user
         members_data.append(serialized_member)
 
     return Response(members_data, status=status.HTTP_200_OK)
@@ -1764,6 +1767,7 @@ def get_family_tree(request):
                 added_edges.add(edge_id)
                 edges.append(
                     {
+                        "id": rel.id,
                         "source": rel.user.id,
                         "target": rel.relative.id,
                         "relationship": rel.relationship_type,
@@ -1785,5 +1789,97 @@ def get_family_tree(request):
             "nodes": nodes_serializer.data,
             "edges": edges,
         },
+        status=status.HTTP_200_OK,
+    )
+
+
+@extend_schema(
+    tags=["Family Tree"],
+    responses={200: _MessageSerializer, 404: _ErrorSerializer},
+    summary="Revoke or delete a family relationship",
+)
+@api_view(["DELETE"])
+@permission_classes([permissions.IsAuthenticated])
+def revoke_family_relationship(request, relationship_id):
+    """
+    Revoke/delete an existing family relationship. Either the initiator or recipient can do this.
+    """
+    try:
+        relationship = FamilyRelationship.objects.get(
+            models.Q(id=relationship_id) & (models.Q(user=request.user) | models.Q(relative=request.user))
+        )
+    except FamilyRelationship.DoesNotExist:
+        return Response(
+            {"error": "Relationship not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    relationship.delete()
+    return Response(
+        {"message": "Family relationship revoked successfully."},
+        status=status.HTTP_200_OK,
+    )
+
+
+@extend_schema(
+    tags=["Family Tree"],
+    request=FamilyRelationshipUpdateSerializer,
+    responses={200: _MessageSerializer, 400: _ErrorSerializer, 403: _ErrorSerializer, 404: _ErrorSerializer},
+    summary="Edit an initiated family relationship type",
+)
+@api_view(["PATCH"])
+@permission_classes([permissions.IsAuthenticated])
+def edit_family_relationship(request, relationship_id):
+    """
+    Edit the relationship type of a connection. Only the initiator can edit it.
+    If the relative is a registered user, the status resets to pending.
+    If the relative is a placeholder, their inferred gender is updated on their profile.
+    """
+    try:
+        relationship = FamilyRelationship.objects.get(id=relationship_id)
+    except FamilyRelationship.DoesNotExist:
+        return Response(
+            {"error": "Relationship not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if relationship.user != request.user:
+        return Response(
+            {"error": "Only the initiator can edit this relationship."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    serializer = FamilyRelationshipUpdateSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    new_type = serializer.validated_data["relationship_type"]
+    if new_type == relationship.relationship_type:
+        return Response(
+            {"message": "Relationship type is already set to this value."},
+            status=status.HTTP_200_OK,
+        )
+
+    relationship.relationship_type = new_type
+
+    # Handle status resets and gender inferences
+    relative = relationship.relative
+    if not relative.is_invited:
+        # Reset to pending for registered users
+        relationship.status = "pending"
+    else:
+        # If relative is invited/placeholder, update their profile gender if inferred
+        profile, _ = Profile.objects.get_or_create(user=relative)
+        if new_type in ["father", "son"]:
+            profile.gender = "male"
+            profile.save()
+        elif new_type in ["mother", "daughter"]:
+            profile.gender = "female"
+            profile.save()
+
+    relationship.save()
+
+    return Response(
+        {"message": "Relationship type updated successfully."},
         status=status.HTTP_200_OK,
     )

@@ -230,3 +230,47 @@ class FamilyTreeTestCase(APITestCase):
         # Verify edges count
         edges = response.data["edges"]
         self.assertEqual(len(edges), 2)
+
+    def test_revoke_family_relationship(self):
+        """
+        Revoking a relationship should successfully delete the relationship record.
+        """
+        # Create an accepted relationship
+        rel = FamilyRelationship.objects.create(
+            user=self.user_a,
+            relative=self.user_b,
+            relationship_type="spouse",
+            status="accepted"
+        )
+        
+        # Revoke the relationship using User A
+        self.client.force_authenticate(user=self.user_a)
+        revoke_url = reverse("revoke_family_relationship", args=[rel.id])
+        response = self.client.delete(revoke_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Verify it is deleted
+        self.assertFalse(FamilyRelationship.objects.filter(id=rel.id).exists())
+
+    def test_edit_family_relationship(self):
+        """
+        Editing a relationship type should update it and reset status to pending for registered users.
+        """
+        # Create an accepted relationship (User A -> User B as Spouse)
+        rel = FamilyRelationship.objects.create(
+            user=self.user_a,
+            relative=self.user_b,
+            relationship_type="spouse",
+            status="accepted"
+        )
+        
+        # Edit the relationship type (from Spouse to Mother)
+        self.client.force_authenticate(user=self.user_a)
+        edit_url = reverse("edit_family_relationship", args=[rel.id])
+        response = self.client.patch(edit_url, {"relationship_type": "mother"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Verify it updated and reset to pending
+        rel.refresh_from_db()
+        self.assertEqual(rel.relationship_type, "mother")
+        self.assertEqual(rel.status, "pending")
