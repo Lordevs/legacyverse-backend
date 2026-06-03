@@ -1,5 +1,5 @@
 
-from rest_framework import status
+from rest_framework import status, serializers as rf_serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -11,9 +11,37 @@ import google.oauth2.id_token
 from urllib.parse import urlencode
 from django.http import JsonResponse
 import requests
+from drf_spectacular.utils import extend_schema
+from .serializers import UserSerializer as _GUserSerializer
+
+
+# ── Inline response serializers ───────────────────────────────────────────────
+class _GoogleTokenResponseSerializer(rf_serializers.Serializer):
+    refresh = rf_serializers.CharField()
+    access = rf_serializers.CharField()
+    user = _GUserSerializer()
+    created = rf_serializers.BooleanField(
+        help_text='True if this is a newly registered account'
+    )
+
+
+class _GoogleAuthRequestSerializer(rf_serializers.Serializer):
+    id_token = rf_serializers.CharField(
+        help_text='Google OAuth2 id_token obtained from the frontend'
+    )
+
+
+class _GoogleUrlResponseSerializer(rf_serializers.Serializer):
+    auth_url = rf_serializers.CharField()
+
+
+class _GErrorSerializer(rf_serializers.Serializer):
+    error = rf_serializers.CharField()
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 User = get_user_model()
+
 
 def google_authenticate_and_respond(id_token_str):
     """
@@ -46,8 +74,13 @@ def google_authenticate_and_respond(id_token_str):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-User = get_user_model()
 
+@extend_schema(
+    tags=["Auth"],
+    request=_GoogleAuthRequestSerializer,
+    responses={200: _GoogleTokenResponseSerializer, 400: _GErrorSerializer},
+    summary="Google OAuth2 – verify id_token and return JWT tokens (SPA/mobile flow)",
+)
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def google_auth_view(request):
@@ -61,6 +94,11 @@ def google_auth_view(request):
     return google_authenticate_and_respond(id_token_str)
 
 
+@extend_schema(
+    tags=["Auth"],
+    responses={200: _GoogleUrlResponseSerializer},
+    summary="Google OAuth2 – get the authorization URL to redirect the user to",
+)
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def google_oauth_url(request):
@@ -79,11 +117,16 @@ def google_oauth_url(request):
     return JsonResponse({'auth_url': url})
 
 
+@extend_schema(
+    tags=["Auth"],
+    responses={200: _GoogleTokenResponseSerializer, 400: _GErrorSerializer},
+    summary="Google OAuth2 callback – exchange code for JWT tokens (server-side flow)",
+)
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def google_oauth_callback(request):
     """
-    Handles Google's redirect, exchanges code for id_token, and logs in/registers user.
+    Handles Google redirect, exchanges code for id_token, and logs in/registers user.
     """
     code = request.GET.get('code')
     if not code:
@@ -103,5 +146,4 @@ def google_oauth_callback(request):
     id_token_str = token_data.get('id_token')
     if not id_token_str:
         return Response({'error': 'No id_token in response.'}, status=status.HTTP_400_BAD_REQUEST)
-    # Use helper directly
     return google_authenticate_and_respond(id_token_str)

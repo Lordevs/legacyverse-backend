@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "corsheaders",
+    "drf_spectacular",
     "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
@@ -185,6 +186,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 # JWT Configuration
@@ -236,3 +238,39 @@ GOOGLE_OAUTH_CLIENT_SECRET = config("GOOGLE_OAUTH_CLIENT_SECRET", default="")
 GOOGLE_OAUTH_REDIRECT_URI = config(
     "GOOGLE_OAUTH_REDIRECT_URI", default="http://api.memoriva.org/auth/callback"
 )
+
+# ─── API Documentation (drf-spectacular) ───────────────────────────────────────
+SPECTACULAR_SETTINGS = {
+    "TITLE": "LegacyVerse API",
+    "DESCRIPTION": (
+        "LegacyVerse is a legacy & memory-preservation platform. "
+        "This API provides user authentication, profile management, "
+        "blog (memoir) creation with AI assistance, comments, likes, "
+        "saved posts, and view analytics.\n\n"
+        "**Authentication:** All protected endpoints require a JWT Bearer token.\n"
+        "Obtain tokens via `POST /api/user/auth/login/` or `POST /api/user/auth/register/`."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    # Security scheme – JWT Bearer
+    "SECURITY": [{"jwtAuth": []}],
+    "COMPONENT_SPLIT_REQUEST": True,
+    # Swagger UI tweaks
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+        "displayOperationId": False,
+        "filter": True,
+    },
+    # Tag grouping order (mirrors URL structure)
+    "TAGS": [
+        {"name": "Auth", "description": "Registration, login, logout, password reset & Google OAuth"},
+        {"name": "Profile", "description": "User profile, sections, and section images"},
+        {"name": "Admin – Users", "description": "Admin-only user management endpoints"},
+        {"name": "Blogs", "description": "Blog CRUD, likes, saves, and view tracking"},
+        {"name": "Comments", "description": "Blog comments and replies"},
+        {"name": "AI", "description": "OpenAI-powered blog generation and rewriting"},
+        {"name": "Public", "description": "Public listing / lookup endpoints"},
+    ],
+}
+
