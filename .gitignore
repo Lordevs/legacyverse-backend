@@ -40,6 +40,10 @@ env/
 ENV/
 env.bak/
 venv.bak/
+.venv/
+
+# uv
+uv.lock
 
 # IDE
 .vscode/
