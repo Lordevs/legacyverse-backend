@@ -299,7 +299,7 @@ class ProfileImageSerializer(serializers.ModelSerializer):
             try:
                 data = data.copy()  # Make data mutable
                 data["captions"] = json.loads(data["captions"])
-            except json.JSONDecodeError, ValueError:
+            except (json.JSONDecodeError, ValueError):
                 # If it's not valid JSON, treat it as a single caption
                 data = data.copy()
                 data["captions"] = [data["captions"]]

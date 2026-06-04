@@ -2,7 +2,7 @@
 name = "legacyverse-backend"
 version = "0.1.0"
 description = "LegacyVerse Django REST API backend"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
    "django>=5.1.4",
    "django-allauth>=0.62.1",
