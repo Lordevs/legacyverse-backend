@@ -335,3 +335,87 @@ class FamilyTreeTestCase(APITestCase):
         }
         response = self.client.post(self.add_url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_add_deceased_relative_to_anchor_member(self):
+        """
+        Tests adding a deceased relative to an anchor member (e.g., A's mother B).
+        User A adds their mother B's father (Great-grandfather of A).
+        """
+        # A's mother is B (accepted)
+        FamilyRelationship.objects.create(
+            user=self.user_a,
+            relative=self.user_b,
+            relationship_type="mother",
+            status="accepted",
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        data = {
+            "fullname": "Great Grandfather",
+            "relationship_type": "father",
+            "is_deceased": True,
+            "gender": "male",
+            "anchor_user_id": str(self.user_b.id),
+        }
+        response = self.client.post(self.add_url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify the new relation was created: B's father is the new deceased user
+        new_relation = FamilyRelationship.objects.filter(user=self.user_b, relationship_type="father").first()
+        self.assertIsNotNone(new_relation)
+        self.assertEqual(new_relation.relative.fullname, "Great Grandfather")
+        self.assertTrue(new_relation.relative.is_deceased)
+        self.assertEqual(new_relation.status, "accepted")
+
+    def test_add_deceased_relative_to_invalid_anchor_member(self):
+        """
+        Tests that an error is returned if trying to add a relative to an anchor
+        member who is not in the requester's family tree.
+        """
+        # User C is completely disconnected from User A's tree
+        user_c = User.objects.create_user(
+            email="userc_independent@example.com", password="Password123!", fullname="User C"
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        data = {
+            "fullname": "Great Grandfather",
+            "relationship_type": "father",
+            "is_deceased": True,
+            "gender": "male",
+            "anchor_user_id": str(user_c.id),
+        }
+        response = self.client.post(self.add_url, data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("own family tree", response.data["error"])
+
+    def test_add_living_relative_to_anchor_member_success(self):
+        """
+        Tests that adding a living relative to an anchor member is successful.
+        """
+        # A's mother is B
+        FamilyRelationship.objects.create(
+            user=self.user_a,
+            relative=self.user_b,
+            relationship_type="mother",
+            status="accepted",
+        )
+
+        self.client.force_authenticate(user=self.user_a)
+        data = {
+            "email": "living_relative@example.com",
+            "fullname": "Uncle Bob",
+            "relationship_type": "son",
+            "is_deceased": False,
+            "anchor_user_id": str(self.user_b.id),
+        }
+        response = self.client.post(self.add_url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify relationship exists between B (anchor) and Uncle Bob
+        living_rel = User.objects.get(email="living_relative@example.com")
+        rel = FamilyRelationship.objects.get(user=self.user_b, relative=living_rel)
+        self.assertEqual(rel.status, "accepted")
+        self.assertEqual(rel.added_by, self.user_a)
+
+

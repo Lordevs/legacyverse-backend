@@ -78,6 +78,7 @@ class User(AbstractUser):
     fullname = models.CharField(max_length=255)
     is_verified = models.BooleanField(default=False)
     is_invited = models.BooleanField(default=False)
+    is_deceased = models.BooleanField(default=False, help_text="True for deceased placeholder accounts with no real user")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -122,6 +123,8 @@ class Profile(models.Model):
         max_length=20, choices=GENDER_CHOICES, default="prefer_not_to_say"
     )
     date_of_birth = models.DateField(null=True, blank=True, help_text="User's date of birth")
+    is_deceased = models.BooleanField(default=False, help_text="True if this registered user has been marked as deceased")
+    date_of_death = models.DateField(null=True, blank=True, help_text="Date of death (optional)")
 
     # Dynamic sections as JSON array - super simple!
     sections = models.JSONField(
@@ -284,6 +287,13 @@ class FamilyRelationship(models.Model):
     )
     relationship_type = models.CharField(max_length=20, choices=RELATIONSHIP_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    added_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_relationships",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

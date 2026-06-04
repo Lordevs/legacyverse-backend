@@ -54,6 +54,7 @@ from user.views.family import (
     get_family_tree,
     list_family_members,
     list_family_requests,
+    mark_member_deceased,
     respond_to_family_request,
     revoke_family_relationship,
 )
@@ -108,6 +109,7 @@ __all__ = [
     "get_family_tree",
     "list_family_members",
     "list_family_requests",
+    "mark_member_deceased",
     "respond_to_family_request",
     "revoke_family_relationship",
 ]

@@ -2,6 +2,7 @@
 Pure helper functions for the Family Tree feature.
 No HTTP logic — only tree traversal and label utilities.
 """
+from django.db import models as db_models
 from ..models import FamilyRelationship
 
 
@@ -77,3 +78,30 @@ def _get_inverted_relationship(relationship_type, initiator_gender):
     elif relationship_type == "spouse":
         return "Spouse"
     return "Relative"
+
+
+def _get_all_tree_members(user):
+    """
+    BFS traversal in ALL directions to collect every user ID reachable from `user`.
+    Used to verify that an anchor user is actually in the requester's family tree
+    before allowing an anchored add operation.
+    """
+    visited = {user.id}
+    queue = [user]
+
+    while queue:
+        current = queue.pop(0)
+
+        # All accepted relationships in any direction
+        rels = FamilyRelationship.objects.filter(
+            (db_models.Q(user=current) | db_models.Q(relative=current)),
+            status="accepted",
+        ).select_related("user", "relative")
+
+        for rel in rels:
+            neighbor = rel.relative if rel.user == current else rel.user
+            if neighbor.id not in visited:
+                visited.add(neighbor.id)
+                queue.append(neighbor)
+
+    return visited

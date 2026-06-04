@@ -371,12 +371,36 @@ class ResetPasswordSerializer(serializers.Serializer):
 
 
 class FamilyMemberAddSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
     fullname = serializers.CharField(max_length=255)
     relationship_type = serializers.ChoiceField(
         choices=FamilyRelationship.RELATIONSHIP_CHOICES
     )
     date_of_birth = serializers.DateField(required=False, allow_null=True)
+    # Deceased placeholder fields
+    is_deceased = serializers.BooleanField(required=False, default=False)
+    gender = serializers.ChoiceField(
+        choices=[("male", "Male"), ("female", "Female"), ("other", "Other"), ("prefer_not_to_say", "Prefer not to say")],
+        required=False,
+        allow_null=True,
+    )
+    date_of_death = serializers.DateField(required=False, allow_null=True)
+    # Anchor: if set, the relationship is created relative to this user, not the requester
+    anchor_user_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        is_deceased = attrs.get("is_deceased", False)
+        email = attrs.get("email")
+
+        if not is_deceased and not email:
+            raise serializers.ValidationError(
+                {"email": "Email is required when adding a living family member."}
+            )
+        if is_deceased and not attrs.get("gender"):
+            raise serializers.ValidationError(
+                {"gender": "Gender is required when adding a deceased family member."}
+            )
+        return attrs
 
 
 class FamilyRelationshipRequestSerializer(serializers.ModelSerializer):
@@ -408,9 +432,12 @@ class FamilyTreeMemberSerializer(serializers.ModelSerializer):
     fullname = serializers.CharField()
     email = serializers.EmailField()
     username = serializers.CharField(read_only=True)
-    gender = serializers.CharField(source="profile.gender", read_only=True)
-    date_of_birth = serializers.DateField(source="profile.date_of_birth", read_only=True)
+    gender = serializers.SerializerMethodField()
+    date_of_birth = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
+    is_deceased = serializers.SerializerMethodField()
+    date_of_death = serializers.SerializerMethodField()
+    # is_initiator and initiator_name are injected dynamically in the view
 
     class Meta:
         model = User
@@ -422,7 +449,36 @@ class FamilyTreeMemberSerializer(serializers.ModelSerializer):
             "gender",
             "date_of_birth",
             "image",
+            "is_deceased",
+            "date_of_death",
         )
+
+    def get_gender(self, obj):
+        try:
+            return obj.profile.gender
+        except Exception:
+            return "prefer_not_to_say"
+
+    def get_date_of_birth(self, obj):
+        try:
+            return obj.profile.date_of_birth
+        except Exception:
+            return None
+
+    def get_is_deceased(self, obj):
+        """Deceased if User.is_deceased (placeholder) OR Profile.is_deceased (registered)"""
+        if obj.is_deceased:
+            return True
+        try:
+            return obj.profile.is_deceased
+        except Exception:
+            return False
+
+    def get_date_of_death(self, obj):
+        try:
+            return obj.profile.date_of_death
+        except Exception:
+            return None
 
     def get_image(self, obj):
         try:
@@ -432,7 +488,7 @@ class FamilyTreeMemberSerializer(serializers.ModelSerializer):
                 if request:
                     return request.build_absolute_uri(profile.image.url)
                 return profile.image.url
-        except:
+        except Exception:
             pass
         return None
 
@@ -442,6 +498,7 @@ class FamilyTreeEdgeSerializer(serializers.Serializer):
     source = serializers.UUIDField()
     target = serializers.UUIDField()
     relationship = serializers.CharField()
+    is_editable = serializers.BooleanField(required=False, default=False)
 
 
 class FamilyTreeResponseSerializer(serializers.Serializer):
