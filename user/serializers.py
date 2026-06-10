@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from .models import User, Profile, SectionImage, FamilyRelationship
+from .models import User, Profile, SectionImage, FamilyRelationship, FamilyRelationshipSuggestion
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -370,29 +370,51 @@ class ResetPasswordSerializer(serializers.Serializer):
         return value
 
 
+# ── Family Tree Serializers ───────────────────────────────────────────────────
+
+# User-facing relationship input types (what the person means in plain English)
+RELATIONSHIP_INPUT_CHOICES = [
+    ("father",   "Father"),
+    ("mother",   "Mother"),
+    ("son",      "Son"),
+    ("daughter", "Daughter"),
+    ("brother",  "Brother"),
+    ("sister",   "Sister"),
+    ("spouse",   "Spouse"),
+]
+
+GENDER_CHOICES = [
+    ("male",           "Male"),
+    ("female",         "Female"),
+    ("other",          "Other"),
+    ("prefer_not_to_say", "Prefer not to say"),
+]
+
+
 class FamilyMemberAddSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
+    """Input serializer for adding a family member."""
+
+    # What is this person to the subject (requester or anchor)?
+    relationship_to_me = serializers.ChoiceField(choices=RELATIONSHIP_INPUT_CHOICES)
     fullname = serializers.CharField(max_length=255)
-    relationship_type = serializers.ChoiceField(
-        choices=FamilyRelationship.RELATIONSHIP_CHOICES
-    )
+
+    # Required for living members; omitted for deceased placeholders
+    email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
+
+    # Optional personal details
     date_of_birth = serializers.DateField(required=False, allow_null=True)
-    # Deceased placeholder fields
+
+    # Deceased placeholder — no email required, gender required
     is_deceased = serializers.BooleanField(required=False, default=False)
-    gender = serializers.ChoiceField(
-        choices=[("male", "Male"), ("female", "Female"), ("other", "Other"), ("prefer_not_to_say", "Prefer not to say")],
-        required=False,
-        allow_null=True,
-    )
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES, required=False, allow_null=True)
     date_of_death = serializers.DateField(required=False, allow_null=True)
-    # Anchor: if set, the relationship is created relative to this user, not the requester
+
+    # Anchor: add this person as a relative of anchor_user_id, not the requester
     anchor_user_id = serializers.UUIDField(required=False, allow_null=True)
 
     def validate(self, attrs):
         is_deceased = attrs.get("is_deceased", False)
-        email = attrs.get("email")
-
-        if not is_deceased and not email:
+        if not is_deceased and not attrs.get("email"):
             raise serializers.ValidationError(
                 {"email": "Email is required when adding a living family member."}
             )
@@ -404,40 +426,92 @@ class FamilyMemberAddSerializer(serializers.Serializer):
 
 
 class FamilyRelationshipRequestSerializer(serializers.ModelSerializer):
-    user_id = serializers.UUIDField(source="user.id", read_only=True)
-    user_fullname = serializers.CharField(source="user.fullname", read_only=True)
-    user_email = serializers.EmailField(source="user.email", read_only=True)
+    """Serializer for incoming pending relationship requests."""
+
+    # added_by is always the initiator in the new model (canonical ordering means
+    # user/relative fields don't identify initiator vs. recipient).
+    from_user_id = serializers.SerializerMethodField()
+    from_user_fullname = serializers.SerializerMethodField()
     relationship_type = serializers.CharField(read_only=True)
 
     class Meta:
         model = FamilyRelationship
         fields = (
             "id",
-            "user_id",
-            "user_fullname",
-            "user_email",
+            "from_user_id",
+            "from_user_fullname",
             "relationship_type",
             "status",
             "created_at",
         )
 
+    def get_from_user_id(self, obj):
+        return str(obj.added_by_id) if obj.added_by_id else str(obj.user_id)
+
+    def get_from_user_fullname(self, obj):
+        if obj.added_by:
+            return obj.added_by.fullname
+        return obj.user.fullname
+
+
+class FamilySentRequestSerializer(serializers.ModelSerializer):
+    """Serializer for outgoing pending relationship requests (sent by the current user)."""
+
+    to_user_id = serializers.SerializerMethodField()
+    to_user_fullname = serializers.SerializerMethodField()
+    to_user_email = serializers.SerializerMethodField()
+    relationship_type = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = FamilyRelationship
+        fields = (
+            "id",
+            "to_user_id",
+            "to_user_fullname",
+            "to_user_email",
+            "relationship_type",
+            "status",
+            "created_at",
+        )
+
+    def _get_to_user(self, obj):
+        if obj.added_by_id and str(obj.user_id) == str(obj.added_by_id):
+            return obj.relative
+        return obj.user
+
+    def get_to_user_id(self, obj):
+        return str(self._get_to_user(obj).id)
+
+    def get_to_user_fullname(self, obj):
+        return self._get_to_user(obj).fullname
+
+    def get_to_user_email(self, obj):
+        to_user = self._get_to_user(obj)
+        if getattr(to_user, "is_invited", False) or getattr(to_user, "is_placeholder", False):
+            return None
+        return to_user.email
+
 
 class FamilyRequestRespondSerializer(serializers.Serializer):
-    action = serializers.ChoiceField(
-        choices=[("accept", "Accept"), ("reject", "Reject")]
-    )
+    action = serializers.ChoiceField(choices=[("accept", "Accept"), ("reject", "Reject")])
 
 
 class FamilyTreeMemberSerializer(serializers.ModelSerializer):
+    """
+    Serializes a User node for the family tree.
+    Internal placeholder emails are hidden (returned as null).
+    """
+
     fullname = serializers.CharField()
-    email = serializers.EmailField()
+    # email is intentionally nullable — placeholder/deceased users have internal emails
+    email = serializers.SerializerMethodField()
     username = serializers.CharField(read_only=True)
     gender = serializers.SerializerMethodField()
     date_of_birth = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
     is_deceased = serializers.SerializerMethodField()
+    is_placeholder = serializers.SerializerMethodField()
     date_of_death = serializers.SerializerMethodField()
-    # is_initiator and initiator_name are injected dynamically in the view
 
     class Meta:
         model = User
@@ -450,8 +524,15 @@ class FamilyTreeMemberSerializer(serializers.ModelSerializer):
             "date_of_birth",
             "image",
             "is_deceased",
+            "is_placeholder",
             "date_of_death",
         )
+
+    def get_email(self, obj):
+        # Don't expose internal placeholder / deceased emails
+        if obj.is_invited or obj.is_deceased:
+            return None
+        return obj.email
 
     def get_gender(self, obj):
         try:
@@ -466,13 +547,16 @@ class FamilyTreeMemberSerializer(serializers.ModelSerializer):
             return None
 
     def get_is_deceased(self, obj):
-        """Deceased if User.is_deceased (placeholder) OR Profile.is_deceased (registered)"""
         if obj.is_deceased:
             return True
         try:
             return obj.profile.is_deceased
         except Exception:
             return False
+
+    def get_is_placeholder(self, obj):
+        """True for invited (not-yet-registered) and deceased placeholder users."""
+        return obj.is_invited or obj.is_deceased
 
     def get_date_of_death(self, obj):
         try:
@@ -497,8 +581,12 @@ class FamilyTreeEdgeSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     source = serializers.UUIDField()
     target = serializers.UUIDField()
-    relationship = serializers.CharField()
-    is_editable = serializers.BooleanField(required=False, default=False)
+    relationship_type = serializers.CharField()
+    label_from_source = serializers.CharField()
+    label_for_viewer = serializers.CharField(allow_null=True)
+    added_by_id = serializers.CharField(allow_null=True)
+    added_by_name = serializers.CharField(allow_null=True)
+    is_editable = serializers.BooleanField(default=False)
 
 
 class FamilyTreeResponseSerializer(serializers.Serializer):
@@ -507,6 +595,24 @@ class FamilyTreeResponseSerializer(serializers.Serializer):
 
 
 class FamilyRelationshipUpdateSerializer(serializers.Serializer):
-    relationship_type = serializers.ChoiceField(
-        choices=FamilyRelationship.RELATIONSHIP_CHOICES
-    )
+    """Input for editing an existing edge — expressed in the same user-friendly vocabulary."""
+    relationship_to_me = serializers.ChoiceField(choices=RELATIONSHIP_INPUT_CHOICES)
+
+
+class FamilyRelationshipSuggestionSerializer(serializers.ModelSerializer):
+    """Serializer for system-generated relationship suggestions."""
+
+    suggested_person = FamilyTreeMemberSerializer(read_only=True)
+    edge_type = serializers.CharField(read_only=True)
+    role = serializers.CharField(allow_null=True, read_only=True)
+    reason = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = FamilyRelationshipSuggestion
+        fields = ("id", "suggested_person", "edge_type", "role", "reason", "created_at")
+
+
+class MarkDeceasedSerializer(serializers.Serializer):
+    """Input for marking a person as deceased or living."""
+    is_deceased = serializers.BooleanField()
+    date_of_death = serializers.DateField(required=False, allow_null=True)

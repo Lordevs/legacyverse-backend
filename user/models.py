@@ -265,18 +265,18 @@ class SectionImage(models.Model):
 
 
 class FamilyRelationship(models.Model):
+    # Three structural edge types — human labels (Father/Brother/etc.) are derived at read time.
+    # parent_child: user=parent, relative=child (directed, never swapped)
+    # sibling/spouse: canonical ordering enforced in save() so user.id < relative.id always
     RELATIONSHIP_CHOICES = [
-        ("father", "Father"),
-        ("mother", "Mother"),
-        ("son", "Son"),
-        ("daughter", "Daughter"),
+        ("parent_child", "Parent-Child"),
+        ("sibling", "Sibling"),
         ("spouse", "Spouse"),
     ]
 
     STATUS_CHOICES = [
         ("pending", "Pending"),
         ("accepted", "Accepted"),
-        ("rejected", "Rejected"),
     ]
 
     user = models.ForeignKey(
@@ -299,9 +299,61 @@ class FamilyRelationship(models.Model):
 
     class Meta:
         unique_together = ("user", "relative")
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["relative", "status"]),
+            models.Index(fields=["added_by"]),
+            models.Index(fields=["status"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        # Enforce canonical ordering for undirected edge types so (A,B) and (B,A)
+        # always produce the same record — prevents duplicates and simplifies queries.
+        if self.relationship_type in ("sibling", "spouse"):
+            if str(self.user_id) > str(self.relative_id):
+                self.user_id, self.relative_id = self.relative_id, self.user_id
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.user.fullname} -> {self.relationship_type} -> {self.relative.fullname} ({self.status})"
+        return f"{self.user.fullname} -- {self.relationship_type} -- {self.relative.fullname} ({self.status})"
+
+
+class FamilyRelationshipSuggestion(models.Model):
+    """
+    System-generated suggestions derived from the connected tree graph.
+    E.g. "Alice's sibling Bob has parent Carol — Carol may also be your parent."
+    When a user accepts a suggestion, a real FamilyRelationship edge is created.
+    """
+    ROLE_CHOICES = [
+        ("as_parent", "As Parent"),
+        ("as_child", "As Child"),
+    ]
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("dismissed", "Dismissed"),
+    ]
+
+    suggested_to = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="family_suggestions"
+    )
+    suggested_person = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="suggested_in_family"
+    )
+    edge_type = models.CharField(max_length=20, choices=FamilyRelationship.RELATIONSHIP_CHOICES)
+    # role only applies to parent_child edges: are we suggesting suggested_person as a parent or child?
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, null=True, blank=True)
+    reason = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("suggested_to", "suggested_person")]
+        indexes = [
+            models.Index(fields=["suggested_to", "status"]),
+        ]
+
+    def __str__(self):
+        return f"Suggest {self.suggested_person.fullname} to {self.suggested_to.fullname} ({self.edge_type})"
 
 
 class PasswordResetToken(models.Model):

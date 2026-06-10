@@ -52,12 +52,15 @@ urlpatterns = [
     # Family Tree URLs
     path('family/add/', views.add_family_member, name='add_family_member'),
     path('family/requests/', views.list_family_requests, name='list_family_requests'),
+    path('family/requests/sent/', views.list_sent_family_requests, name='list_sent_family_requests'),
     path('family/requests/<int:request_id>/respond/', views.respond_to_family_request, name='respond_to_family_request'),
     path('family/members/', views.list_family_members, name='list_family_members'),
     path('family/tree/', views.get_family_tree, name='get_family_tree'),
     path('family/relations/<int:relationship_id>/', views.revoke_family_relationship, name='revoke_family_relationship'),
     path('family/relations/<int:relationship_id>/edit/', views.edit_family_relationship, name='edit_family_relationship'),
     path('family/members/<uuid:user_id>/deceased/', views.mark_member_deceased, name='mark_member_deceased'),
+    path('family/suggestions/', views.list_suggestions, name='list_suggestions'),
+    path('family/suggestions/<int:suggestion_id>/respond/', views.respond_to_suggestion, name='respond_to_suggestion'),
 
     # Username pattern should be last to avoid conflicts
     path('profile/<str:username>/', views.get_profile_by_username, name='profile_by_username'),

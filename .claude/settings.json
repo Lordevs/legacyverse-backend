@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/saadaanhassan/Documents/Projects/legacyverse/src/app/user/family/**)",
+      "Read(//Users/saadaanhassan/Documents/Projects/legacyverse/src/components/family/**)",
+      "Read(//Users/saadaanhassan/Documents/Projects/legacyverse/**)",
+      "Bash(npx tsc *)",
+      "Bash(bash -c 'cd /Users/saadaanhassan/Documents/Projects/legacyverse && npx tsc --noEmit 2>&1 | head -80')",
+      "Bash(bash -c 'grep -n \"relationship_to_me\\\\|relationship_type\\\\|from_user_fullname\\\\|added_by_name\\\\|suggestions\" /Users/saadaanhassan/Documents/Projects/legacyverse/src/components/family/family-lists.tsx | head -30')",
+      "Bash(bash -c 'grep -n \"relationship_type\\\\|added_by_name\\\\|parent_child\\\\|sibling\\\\|spouse\" /Users/saadaanhassan/Documents/Projects/legacyverse/src/components/family/family-tree-canvas.tsx | head -30')",
+      "Bash(bash -c 'grep -n \"suggestions\\\\|handleRespond\" /Users/saadaanhassan/Documents/Projects/legacyverse/src/app/user/family/page.tsx | head -25')",
+      "Bash(bash -c 'grep -n \"is_initiator\\\\|relationship_id\\\\|Revoke\\\\|Edit\" /Users/saadaanhassan/Documents/Projects/legacyverse/src/components/family/family-lists.tsx')",
+      "Bash(bash -c 'python manage.py test user.tests --verbosity=2 2>&1 | tail -30')",
+      "Bash(bash -c 'cd /Users/saadaanhassan/Documents/Projects/legacyverse && npx tsc --noEmit 2>&1')",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(/Users/saadaanhassan/Documents/Projects/legacyverse/node_modules/.bin/tsc --noEmit --project /Users/saadaanhassan/Documents/Projects/legacyverse/tsconfig.json)",
+      "Bash(python manage.py test user.tests --verbosity=1)",
+      "Bash(python manage.py test user.tests --verbosity=0)",
+      "Bash(echo \"exit: $?\")"
+    ],
+    "additionalDirectories": [
+      "/Users/saadaanhassan/Documents/Projects/legacyverse/src/constants",
+      "/Users/saadaanhassan/Documents/Projects/legacyverse/src/lib",
+      "/Users/saadaanhassan/Documents/Projects/legacyverse/src/components/family",
+      "/Users/saadaanhassan/Documents/Projects/legacyverse/src/app/user/family"
+    ]
+  }
+}
